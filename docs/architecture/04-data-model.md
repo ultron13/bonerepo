@@ -24,6 +24,15 @@ value. A forgotten `WHERE` clause then returns nothing instead of leaking across
 tenants. Application-level scoping still exists, but as a convenience and a
 clearer error message, not as the security boundary.
 
+Policies must not depend on joins, so **every tenant-reachable table carries
+`organization_id` directly** — including tables where the value is derivable
+through a parent: `script_versions`, `run_generators`, `run_errors`,
+`baselines`, and the `performance_metrics` hypertable. A denormalised column
+costs sixteen bytes a row; a policy that joins costs a per-row subquery on
+every read, and the tables without a direct policy are exactly the ones a new
+query forgets. The column is stamped at insert from the parent row, never from
+client input.
+
 ## Identity and access
 
 ```sql
@@ -128,6 +137,7 @@ CREATE TABLE script_repos (
 
 CREATE TABLE script_versions (
     id              UUID PRIMARY KEY,
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     script_repo_id  UUID NOT NULL REFERENCES script_repos(id),
     commit_sha      CHAR(40)     NOT NULL,
     plan_path       TEXT         NOT NULL,
@@ -144,7 +154,9 @@ A commit SHA is immutable by construction, so the rule that every execution
 references an immutable version needs no enforcement machinery — it cannot be
 violated. Data files and plugin manifests beside the plan come along
 automatically, which the blob-upload model handled badly. See
-[ADR-0002](../adr/0002-git-sourced-scripts.md).
+[ADR-0002](../adr/0002-git-sourced-scripts.md). The tester-facing contract for
+these repositories — layout, `plimsoll.yaml` manifest, plugin pinning,
+verification — is [script repositories](07-script-repos.md).
 
 ## Performance tests
 
@@ -219,6 +231,7 @@ CREATE TABLE generator_pools (
 
 CREATE TABLE run_generators (
     id              UUID PRIMARY KEY,
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     run_id          UUID NOT NULL REFERENCES test_runs(id) ON DELETE CASCADE,
     pool_id         UUID NOT NULL REFERENCES generator_pools(id),
     ordinal         INTEGER NOT NULL,
@@ -271,8 +284,9 @@ degraded run may not become a baseline and is flagged in every comparison.
 
 ```sql
 CREATE TABLE run_errors (
-    id            UUID PRIMARY KEY,
-    run_id        UUID NOT NULL REFERENCES test_runs(id) ON DELETE CASCADE,
+    id               UUID PRIMARY KEY,
+    organization_id  UUID NOT NULL REFERENCES organizations(id),
+    run_id           UUID NOT NULL REFERENCES test_runs(id) ON DELETE CASCADE,
     fingerprint   VARCHAR(128) NOT NULL,
     error_code    VARCHAR(100),
     message       TEXT,
@@ -292,8 +306,9 @@ row with a count and one stored sample, not twelve thousand rows.
 
 ```sql
 CREATE TABLE baselines (
-    id          UUID PRIMARY KEY,
-    project_id  UUID NOT NULL REFERENCES projects(id),
+    id               UUID PRIMARY KEY,
+    organization_id  UUID NOT NULL REFERENCES organizations(id),
+    project_id       UUID NOT NULL REFERENCES projects(id),
     run_id      UUID NOT NULL REFERENCES test_runs(id),
     name        VARCHAR(255) NOT NULL,
     description TEXT,

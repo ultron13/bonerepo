@@ -15,6 +15,8 @@ A user can:
 - [ ] Log in (single organisation, `ADMIN` and `VIEWER` only)
 - [ ] Create a project
 - [ ] Connect a Git repository and verify credentials
+- [ ] Verify the repository against its `plimsoll.yaml` manifest — or inferred
+      defaults for a bare `.jmx` repo ([script repositories](architecture/07-script-repos.md))
 - [ ] Pin a `.jmx` plan to a resolved commit SHA
 - [ ] Define a performance test — virtual users, duration, linear ramp
 - [ ] Configure SLA rules
@@ -54,6 +56,8 @@ The release that makes the platform useful in a pipeline.
 - CI-triggered runs with `Idempotency-Key`
 - Webhooks: `run.started`, `run.completed`, `run.failed`, `sla.failed`
 - `plimsoll` CLI: `login`, `test run --wait`, `run status`, `run wait`
+- `plimsoll plan lint` — plan hygiene checks, runnable as a pre-commit hook or
+  CI step in the script repository ([script repositories](architecture/07-script-repos.md))
 - Full audit log
 
 Degraded runs cannot become baselines, and are flagged in every comparison.

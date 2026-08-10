@@ -23,6 +23,7 @@ packages/
   executor-sdk/   Executor plugin interface
 images/
   generator/      Container image: JMeter + agent
+  demo-target/    Sample system under test for the seeded demo
 infrastructure/
   docker/ kubernetes/ terraform/
 docs/
@@ -34,7 +35,7 @@ docs/
 
 | Command | Does |
 | --- | --- |
-| `make dev` | Start the control plane (6 containers), migrate, seed the demo project |
+| `make dev` | Start the control plane (6 containers + demo target), migrate, seed the demo project |
 | `make dev-down` | Stop and remove the local stack |
 | `make test` | Unit tests — `pytest` and `vitest` |
 | `make test-int` | Integration tests (requires `make dev`) |

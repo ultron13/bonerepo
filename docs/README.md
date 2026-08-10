@@ -12,6 +12,7 @@ Read in order the first time.
 | [4. Data model](architecture/04-data-model.md) | Schema, tenancy, retention, migrations |
 | [5. Security](architecture/05-security.md) | Threat model, target policy, auth, secrets, isolation |
 | [6. API](architecture/06-api.md) | REST and WebSocket surface, idempotency, CI integration |
+| [7. Script repositories](architecture/07-script-repos.md) | The tester-owned repo contract: layout, `plimsoll.yaml`, plugins, verify |
 
 ## Decision records
 

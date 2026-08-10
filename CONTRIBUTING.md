@@ -35,7 +35,7 @@ else, that is a bug in the setup and worth an issue.
 ```bash
 git clone https://github.com/plimsoll/plimsoll.git
 cd plimsoll
-make dev        # starts 6 containers, migrates, seeds a demo project
+make dev        # starts the control plane + demo target, migrates, seeds a demo project
 make test       # unit tests
 ```
 

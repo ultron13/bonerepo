@@ -70,8 +70,11 @@ lifecycle:
 
 1. **Register** with the control plane using its run-scoped token and ordinal.
 2. **Fetch the plan** — shallow, sparse `git clone` at the pinned commit SHA.
-   CSV data files, `.properties`, and plugin manifests resolve by relative path
-   because they sit beside the `.jmx` in the repository.
+   CSV data files, `.properties`, and the `plimsoll.yaml` manifest resolve by
+   relative path because they sit beside the `.jmx` in the repository
+   ([script repositories](07-script-repos.md)). Plugins named in the manifest
+   must already be present in the generator image or the organisation's plugin
+   mirror — the agent never downloads plugins from the internet at run time.
 3. **Resolve secrets** — variables injected in memory, never written to disk.
 4. **Verify the target** against the policy a second time, immediately before
    traffic starts.

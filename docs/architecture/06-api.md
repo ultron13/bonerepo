@@ -41,6 +41,48 @@ wrong. `requestId` correlates to logs and traces.
 Validation failures return **all** problems at once. Fixing one field at a time
 across seven round trips is a bad experience and worse in CI.
 
+### Error codes
+
+`code` values are part of the `v1` contract: append-only, never renamed, never
+repurposed. The v0.1 catalogue:
+
+| Code | HTTP | Meaning |
+| --- | --- | --- |
+| `VALIDATION_FAILED` | 422 | Request shape or field values invalid; `details` lists every problem |
+| `UNAUTHENTICATED` | 401 | Missing or invalid credentials |
+| `PERMISSION_DENIED` | 403 | Authenticated, but not permitted to do this |
+| `NOT_FOUND` | 404 | Absent — or outside the caller's organisation, indistinguishable by design |
+| `CONFLICT` | 409 | Optimistic-lock `version` mismatch on a concurrent edit |
+| `IDEMPOTENCY_KEY_REUSED` | 409 | Same `Idempotency-Key`, different payload |
+| `TEST_NOT_RUNNABLE` | 422 | Preflight failed; `details` carries every failing check |
+| `TARGET_NOT_ALLOWED` | 422 | A resolved target host is outside the organisation's allowlist |
+| `INSUFFICIENT_CAPACITY` | 422 | No generator pool can supply the requested virtual users |
+| `REPO_UNREACHABLE` | 422 | Git host or credential failure during verify or ref resolution |
+| `RATE_LIMITED` | 429 | Limit exhausted; honour `Retry-After` |
+| `INTERNAL` | 500 | Unexpected fault; `requestId` is the support handle |
+
+## Collections
+
+Every list endpoint pages with an opaque cursor:
+
+```http
+GET /api/v1/runs?limit=50&cursor=eyJydW4iOi...
+```
+
+```json
+{ "items": [ "..." ], "nextCursor": "eyJydW4iOi..." }
+```
+
+- `limit` defaults to 50, capped at 200. `nextCursor` is `null` on the last
+  page. Cursors are opaque; clients never construct or parse one.
+- Cursor pagination rather than offset, because run history grows without
+  bound and offset pagination skips or duplicates rows when inserts land
+  mid-scan — which, on a busy control plane, is always.
+- Filters are per-endpoint query parameters combined with AND:
+  `GET /runs?status=RUNNING&projectId={id}&since=2026-08-01T00:00:00Z`.
+- `sort` takes a documented field name, `-`-prefixed for descending. The
+  default is newest first.
+
 ## Endpoints
 
 ### Auth
@@ -77,7 +119,9 @@ GET    /script-versions/{id}
 `verify` is the endpoint that makes Git-sourced plans usable: it confirms the
 credential works, resolves the ref, and reports what it found — thread groups,
 transaction controllers, referenced data files, required plugins — before anyone
-tries to run it.
+tries to run it. Validation runs against the repository's `plimsoll.yaml`
+manifest where present; [script repositories](07-script-repos.md) defines the
+contract.
 
 ### Performance tests
 ```http
@@ -225,3 +269,16 @@ Per principal and per organisation, returned as `X-RateLimit-*` headers with
 `429` and `Retry-After` on exhaustion. Run-creation limits are separate and
 tighter than read limits — starting load tests is the expensive operation, and
 the one worth throttling.
+
+## Health and version
+
+```http
+GET /healthz          # liveness — the process is up; checks nothing else
+GET /readyz           # readiness — PostgreSQL, Redis, object storage reachable
+GET /api/v1/version   # build version, git SHA, supported API revisions
+```
+
+`/healthz` and `/readyz` sit outside `/api/v1` and are unauthenticated, for
+load balancers and Kubernetes probes; the worker exposes the same two. Ready
+failing while live passes means up-but-degraded — route traffic away, do not
+restart.

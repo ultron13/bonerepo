@@ -109,21 +109,28 @@ Engine-independent, so the UI never learns what JMeter is:
 
 ```sql
 CREATE TABLE performance_metrics (
-    time          TIMESTAMPTZ      NOT NULL,
-    run_id        UUID             NOT NULL,
-    metric_name   VARCHAR(255)     NOT NULL,
-    metric_kind   VARCHAR(20)      NOT NULL,  -- counter | gauge | histogram
-    entity_type   VARCHAR(100),               -- transaction | generator | run
-    entity_id     VARCHAR(255),
-    value         DOUBLE PRECISION,           -- counters and gauges
-    sketch        BYTEA,                      -- histograms
-    tags          JSONB
+    time             TIMESTAMPTZ      NOT NULL,
+    organization_id  UUID             NOT NULL,
+    run_id           UUID             NOT NULL,
+    metric_name      VARCHAR(255)     NOT NULL,
+    metric_kind      VARCHAR(20)      NOT NULL,  -- counter | gauge | histogram
+    entity_type      VARCHAR(100),               -- transaction | generator | run
+    entity_id        VARCHAR(255),
+    value            DOUBLE PRECISION,           -- counters and gauges
+    sketch           BYTEA,                      -- histograms
+    tags             JSONB
 );
 
 SELECT create_hypertable('performance_metrics', 'time');
 ```
 
 Exactly one of `value` or `sketch` is populated, determined by `metric_kind`.
+
+`organization_id` is denormalised onto every row so the row-level-security
+policy applies to the hypertable directly ([data model](04-data-model.md)). It
+is stamped by the metrics worker from the run — never accepted from an agent —
+and carries no foreign key, keeping the hot insert path free of constraint
+lookups.
 
 ## Live streaming
 

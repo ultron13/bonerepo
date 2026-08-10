@@ -116,9 +116,15 @@ Not all ship at once. See [the roadmap](../roadmap.md) for what lands when.
 
 ## Local footprint
 
-`make dev` starts **six** containers: `postgres`, `redis`, `minio`, `api`,
-`worker`, `web`. Generator containers are created on demand and removed after
-each run.
+`make dev` starts **six** control-plane containers — `postgres`, `redis`,
+`minio`, `api`, `worker`, `web` — plus `demo-target`, a small bundled web
+application the seeded demo project is authorised to load test. The target
+policy has no permit-all state ([security](05-security.md)), so the demo ships
+its own system under test with a seeded allowlist entry; without it, a new
+user's first run would fail on policy. `demo-target` is demo workload, not a
+control-plane service, and sits outside the six-container budget of
+[ADR-0005](../adr/0005-redis-streams-over-rabbitmq.md). Generator containers
+are created on demand and removed after each run.
 
 The observability stack is an opt-in `--profile observability`. Contributor
 onboarding is treated as a first-class constraint: a heavyweight default stack

@@ -37,6 +37,10 @@ flowchart LR
 - Allowlists hold hostnames, domain suffixes, and CIDR ranges per organisation.
 - **Empty allowlist means no runs.** There is no implicit permit-all state, and
   no first-run convenience exception.
+- The seeded demo is not an exception either: `make dev` allowlists exactly one
+  host — the bundled `demo-target` container. The first-run experience works
+  because the demo ships its own permitted system under test, not because the
+  check is soft.
 - Checked twice — at run creation and on the agent — so a DNS record repointed
   between admission and execution does not slip through.
 - Loopback, link-local, and cloud metadata endpoints (`169.254.169.254`) are

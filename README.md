@@ -103,9 +103,11 @@ cd plimsoll
 make dev
 ```
 
-Six containers, one command, no Kubernetes required. `make dev` seeds a demo
-project with a JMeter plan so there is something to run immediately. Open
-<http://localhost:3000>.
+One command, no Kubernetes required: six control-plane containers plus a small
+bundled demo target. `make dev` seeds a demo project with a JMeter plan — and a
+target-policy allowlist entry for the bundled target, since an empty allowlist
+permits no runs — so there is something to run, and something it is allowed to
+hit, immediately. Open <http://localhost:3000>.
 
 Locally, generators are Docker containers. In production the same image runs as
 Kubernetes pods. Only the launcher differs — see
@@ -121,6 +123,7 @@ Kubernetes pods. Only the launcher differs — see
 | [Data model](docs/architecture/04-data-model.md) | Schema and tenancy |
 | [Security](docs/architecture/05-security.md) | Auth, secrets, target policy |
 | [API](docs/architecture/06-api.md) | REST and WebSocket surface |
+| [Script repositories](docs/architecture/07-script-repos.md) | The contract for the repo holding your `.jmx` plans |
 | [Decision records](docs/adr/) | Why things are the way they are |
 | [Roadmap](docs/roadmap.md) | Scope per release |
 
