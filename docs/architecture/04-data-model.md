@@ -273,6 +273,12 @@ CREATE TABLE test_runs (
 );
 ```
 
+`run_number` is allocated per project from a `project_run_counters` row taken
+with `SELECT … FOR UPDATE` inside the run-creation transaction. Two concurrent
+starts then serialise on that row rather than racing to violate
+`UNIQUE (project_id, run_number)` — and a rolled-back creation gives its number
+back, which a PostgreSQL sequence would not.
+
 `configuration_snapshot` is the reproducibility guarantee: resolved commit SHAs,
 workload, generator allocation, SLA rules, and target policy version at start.
 Nothing read after a run begins may come from mutable configuration.
