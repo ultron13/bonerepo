@@ -286,10 +286,13 @@ is the single command a pipeline needs.
 
 ## Rate limits
 
-Per principal and per organisation, returned as `X-RateLimit-*` headers with
-`429` and `Retry-After` on exhaustion. Run-creation limits are separate and
-tighter than read limits — starting load tests is the expensive operation, and
-the one worth throttling.
+Per-principal limits ship with v0.1 — Redis is already mandatory for them
+([ADR-0005](../adr/0005-redis-streams-over-rabbitmq.md)) — and per-organisation
+quotas follow at v1.0. Both return `X-RateLimit-*` headers, with `429` and
+`Retry-After` on exhaustion.
+
+Run-creation limits are separate and tighter than read limits — starting load
+tests is the expensive operation, and the one worth throttling.
 
 ## Health and version
 
