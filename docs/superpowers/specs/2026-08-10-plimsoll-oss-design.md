@@ -135,12 +135,12 @@ a repointed DNS record cannot slip between admission and execution. Loopback,
 link-local, and cloud metadata endpoints are blocked unconditionally. The policy
 version is snapshotted onto the run, and rejections and overrides are audited.
 
-> **Assumption, flagged for review.** This posture — enforced by default,
-> loosenable by the operator, never silently absent — was chosen without an
-> explicit decision from the maintainer, because shipping without it would be
-> unsafe. If a softer posture is wanted (warn-and-audit rather than reject), it
-> is a small change to `docs/architecture/05-security.md` and the preflight
-> check, but it should be a deliberate choice rather than a default.
+> **Ratified.** This posture — enforced by default, loosenable by the operator,
+> never silently absent — was originally chosen without an explicit decision
+> from the maintainer, because shipping without it would have been unsafe. The
+> maintainer has since confirmed reject-by-default, and warn-and-audit was
+> considered and rejected. The decision now has its own record:
+> [ADR-0007](../../adr/0007-target-policy-rejects-by-default.md).
 
 ### 9. Data model corrections
 
@@ -204,4 +204,8 @@ costs.
   follow the owner. Moving to a dedicated `plimsoll` organisation later is a
   find-and-replace over those references plus a GitHub redirect, not a
   renaming exercise.
-- **Target policy posture.** See the flagged assumption above.
+- ~~**Target policy posture.**~~ Resolved: reject-by-default, ratified by the
+  maintainer and recorded in
+  [ADR-0007](../../adr/0007-target-policy-rejects-by-default.md).
+
+No open items remain.

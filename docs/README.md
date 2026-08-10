@@ -27,6 +27,7 @@ open a discussion.
 | [ADR-0004](adr/0004-hdr-histogram-metric-merging.md) | Merge histograms; never average percentiles |
 | [ADR-0005](adr/0005-redis-streams-over-rabbitmq.md) | Redis Streams for v0.1, behind an interface |
 | [ADR-0006](adr/0006-jmeter-first-executor.md) | Orchestrate JMeter; build no engine |
+| [ADR-0007](adr/0007-target-policy-rejects-by-default.md) | The target policy rejects; it never merely warns |
 
 ## Planning
 

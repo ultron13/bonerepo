@@ -53,6 +53,9 @@ Operators can widen the policy for a closed network. Disabling it on an
 internet-reachable deployment turns the installation into an open attack proxy
 and is not a supported configuration.
 
+The policy rejects rather than warns, and warn-and-audit was considered and
+rejected — see [ADR-0007](../adr/0007-target-policy-rejects-by-default.md).
+
 ## Plan static analysis
 
 A `.jmx` can execute arbitrary code — JSR223 and BeanShell scripts, the OS

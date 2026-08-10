@@ -82,7 +82,8 @@ not a style preference.
 7. **Authorisation is enforced server-side.** Hiding a button is not access
    control.
 8. **Load generation targets must pass the target policy check** before a run
-   starts. See `docs/architecture/05-security.md`.
+   starts. The check rejects; it never merely warns, and there is no permit-all
+   state. See `docs/architecture/05-security.md` and ADR-0007.
 
 ## Naming
 
