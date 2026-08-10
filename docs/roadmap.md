@@ -54,10 +54,19 @@ The release that makes the platform useful in a pipeline.
 - Per-transaction drill-down, backed by raw artifacts rather than a transaction table
 - API keys with scopes
 - CI-triggered runs with `Idempotency-Key`
-- Webhooks: `run.started`, `run.completed`, `run.failed`, `sla.failed`
+- Webhooks: `run.started`, `run.completed`, `run.failed`, `sla.failed` —
+  managed via the subscription API, with rotatable HMAC secrets
+- GitHub App credential for script repositories; run verdicts posted back to
+  the pinned commit as check runs
+- Data distribution modes for CSV files — shared, partitioned, unique-per-VU
+  ([execution plane](architecture/02-execution-plane.md))
+- Plan static analysis in `verify`: risky JMX elements flagged, with a
+  per-organisation element policy ([security](architecture/05-security.md))
 - `plimsoll` CLI: `login`, `test run --wait`, `run status`, `run wait`
 - `plimsoll plan lint` — plan hygiene checks, runnable as a pre-commit hook or
-  CI step in the script repository ([script repositories](architecture/07-script-repos.md))
+  CI step in the script repository and packaged as a GitHub Action
+  ([script repositories](architecture/07-script-repos.md))
+- Tester-facing guide: writing JMeter plans for Plimsoll
 - Full audit log
 
 Degraded runs cannot become baselines, and are flagged in every comparison.
@@ -66,6 +75,13 @@ Degraded runs cannot become baselines, and are flagged in every comparison.
 
 - Full RBAC matrix, organisation and project roles
 - Multi-tenancy product surface
+- OIDC single sign-on — moved ahead of v1.0, because SSO gates enterprise
+  pilots rather than production hardening
+- Kubernetes deployment via Helm chart — the production runtime gets a
+  first-class install path
+- Audit-log streaming: webhook, syslog, or S3 export into the SIEMs
+  enterprises already run
+- Capacity-planning guide with measured generator sizing tables
 - Scheduling: one-time, daily, weekly, cron
 - Reports: executive summary, performance summary, SLA, comparison — HTML, PDF, CSV, JSON
 - Notifications: email, Slack, Microsoft Teams, webhook
@@ -84,13 +100,13 @@ Degraded runs cannot become baselines, and are flagged in every comparison.
 
 ## v1.0 — Production hardening
 
-- OIDC and SAML
+- SAML and LDAP (OIDC ships in v0.3)
 - High availability: multiple API and worker replicas, scheduler leader election
 - Backup and restore, documented and tested
 - Rate limiting per organisation
 - Full OpenTelemetry instrumentation
 - Documented upgrade path and API stability guarantee
-- Kubernetes deployment via Helm chart
+- Helm chart hardened for HA: replicas, disruption budgets, upgrade hooks
 
 ## Later
 

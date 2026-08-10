@@ -101,7 +101,7 @@ CREATE TABLE credentials (
     id               UUID PRIMARY KEY,
     organization_id  UUID NOT NULL REFERENCES organizations(id),
     name             VARCHAR(255) NOT NULL,
-    kind             VARCHAR(50)  NOT NULL,  -- GIT_SSH_KEY | GIT_TOKEN | VARIABLE | KUBECONFIG
+    kind             VARCHAR(50)  NOT NULL,  -- GIT_SSH_KEY | GIT_TOKEN | GITHUB_APP | VARIABLE | KUBECONFIG
     ciphertext       BYTEA        NOT NULL,
     key_ref          VARCHAR(255) NOT NULL,  -- KMS / Vault key identifier
     created_by       UUID REFERENCES users(id),
@@ -302,7 +302,7 @@ CREATE TABLE run_errors (
 Grouped rather than per-occurrence. Twelve thousand identical HTTP 500s are one
 row with a count and one stored sample, not twelve thousand rows.
 
-## Baselines, idempotency, audit
+## Baselines, idempotency, webhooks, audit
 
 ```sql
 CREATE TABLE baselines (
@@ -342,6 +342,20 @@ CREATE TABLE api_keys (
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE webhook_subscriptions (
+    id                 UUID PRIMARY KEY,
+    organization_id    UUID NOT NULL REFERENCES organizations(id),
+    project_id         UUID REFERENCES projects(id),  -- NULL means all projects
+    url                TEXT NOT NULL,
+    events             TEXT[] NOT NULL,
+    secret_ciphertext  BYTEA NOT NULL,                -- HMAC key; encrypted like credentials
+    key_ref            VARCHAR(255) NOT NULL,
+    status             VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+    created_by         UUID REFERENCES users(id),
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE audit_logs (
     id               UUID PRIMARY KEY,
     organization_id  UUID NOT NULL,
@@ -361,9 +375,14 @@ retried CI request returns the original response rather than starting a second
 run. A key replayed with a *different* `request_hash` is a client error, not a
 cache hit.
 
+Webhook signing secrets are encrypted with the same external-key scheme as
+credentials, shown once at creation, and rotation keeps the previous secret
+valid for an hour so receivers roll over without a delivery gap.
+
 Audited actions: login, logout, project changes, script-repo and credential
 changes, test modification, run start and stop, target-policy changes and
-overrides, user and role changes, API key creation and revocation.
+overrides, user and role changes, API key creation and revocation, and webhook
+subscription changes.
 
 ## Retention
 

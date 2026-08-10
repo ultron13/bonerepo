@@ -126,6 +126,20 @@ Think time maps to JMeter Timers; pacing maps to Constant Throughput Timer;
 parameterisation maps to CSV Data Set Config; transactions map to Transaction
 Controllers.
 
+**Data distribution (v0.2).** A CSV replicated as-is to N generators means
+every generator replays the same rows — the same usernames logging in from
+twenty-five machines at once, cache hit rates inflated, uniqueness constraints
+violated. Replicated data quietly distorts results, so distribution is declared
+per data file in the manifest ([script repositories](07-script-repos.md)) and
+applied by the agent at fetch time:
+
+- **shared** — every generator receives the full file; right for read-only
+  lookup data. The default.
+- **partitioned** — the control plane assigns each generator a disjoint row
+  range, remainder distributed like VU allocation, so rows reconcile exactly.
+- **unique** — rows allocated so no two virtual users anywhere in the run
+  share one.
+
 ## Execution plan
 
 Produced once, immutable, snapshotted onto the run:

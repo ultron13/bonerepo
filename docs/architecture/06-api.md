@@ -185,6 +185,23 @@ GET  /target-policy
 PUT  /target-policy
 ```
 
+### Webhooks
+
+```http
+GET    /webhooks
+POST   /webhooks
+GET    /webhooks/{id}
+PATCH  /webhooks/{id}
+DELETE /webhooks/{id}
+POST   /webhooks/{id}/rotate-secret
+POST   /webhooks/{id}/ping
+```
+
+A subscription names its target URL and the events it wants. The HMAC signing
+secret is shown once at creation; `rotate-secret` issues a new one and honours
+the old for one hour, so receivers roll without dropping deliveries. `ping`
+sends a signed test event.
+
 ## Idempotency
 
 Any state-changing request accepts an `Idempotency-Key`. **CI clients should
@@ -244,11 +261,15 @@ flowchart LR
 ```
 
 Webhook events: `run.started`, `run.completed`, `run.failed`, `sla.failed`.
-Payloads are signed with an HMAC the receiver verifies.
+Payloads are signed with an HMAC the receiver verifies; subscriptions are
+managed at `/webhooks`.
 
 Generic API and webhook support comes first; Jenkins, GitHub Actions, GitLab CI,
 and Azure DevOps ship as thin wrappers over it rather than as separate
-integrations with their own semantics.
+integrations with their own semantics. Two GitHub-specific paths earn their
+wrappers at v0.2: inbound push events at `POST /integrations/github/events`
+resolve new script versions automatically, and run verdicts post back to the
+pinned commit as check runs — see [script repositories](07-script-repos.md).
 
 ## CLI
 

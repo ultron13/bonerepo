@@ -53,8 +53,9 @@ plugins:
 plans:
   - path: checkout.jmx
     data:
-      - data/users.csv
-      - data/cards.csv
+      - path: data/users.csv
+        distribution: unique     # shared | partitioned | unique
+      - path: data/cards.csv     # distribution defaults to shared
     variables:            # names only — values come from Plimsoll secrets
       - API_BASE_URL
       - DB_PASSWORD
@@ -71,6 +72,9 @@ Rules:
   verification.
 - **Plugins pin a version and a checksum.** An unpinned plugin is a
   supply-chain hole and an unreproducible run.
+- **`distribution` defaults to `shared`.** `partitioned` and `unique` ship
+  with the v0.2 workload work — the [execution plane](02-execution-plane.md)
+  defines the modes and why replicated data distorts results.
 - **The manifest is optional** for a repository that needs nothing beyond stock
   JMeter: `verify` parses the plan, discovers referenced data files, and the
   run uses the pool's default generator image. It becomes required the moment a
@@ -108,8 +112,27 @@ contract and reports every failure at once:
 - Every plugin resolves per the order above
 - Declared variables cover the `${…}` references in the plan — names only;
   values are checked at run start, not here
+- Risky elements are flagged (v0.2) — script samplers, process execution,
+  JDBC, file access — and rejected where the organisation's element policy
+  denies them ([security](05-security.md))
 - The plan parses: thread groups, transaction controllers, and timers are
   reported back, which is how the workload editor knows what it is configuring
+
+## GitHub integration
+
+For GitHub-hosted repositories, a **GitHub App installation** is the
+first-class credential (v0.2): short-lived installation tokens instead of a
+long-lived PAT, fine-grained repository access, installed once per
+organisation. Deploy keys and PATs remain the generic path for any Git host.
+
+The integration works in both directions:
+
+- **Push events** arrive at `POST /integrations/github/events` and resolve new
+  script versions automatically, so a merged plan appears in Plimsoll without
+  manual pinning.
+- **Run verdicts return to the commit.** A completed run posts a check run on
+  the pinned SHA — the SLA result lands in the pull request the tester is
+  already reviewing.
 
 ## Tooling
 
@@ -120,9 +143,9 @@ contract and reports every failure at once:
   checks plus static plan hygiene (GUI listeners left enabled, thread groups
   not wired to `${__P(threads)}`, absolute paths, unnamed transaction
   controllers), runnable as a pre-commit hook or CI step in the script
-  repository itself, so a broken plan never merges.
+  repository itself, so a broken plan never merges. Packaged as a GitHub
+  Action, so the check runs on every pull request to the script repository.
 
-Large datasets (Git LFS, object-storage references) and per-generator data
-distribution modes are follow-on work to this contract, not part of v0.1.
-Until then, keep CSV files small enough that cloning them per generator is
-unremarkable.
+Large datasets remain follow-on work: Git LFS support and object-storage
+references for files too big to clone per generator. Until then, keep CSV
+files small enough that cloning them per generator is unremarkable.

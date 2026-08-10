@@ -53,6 +53,21 @@ Operators can widen the policy for a closed network. Disabling it on an
 internet-reachable deployment turns the installation into an open attack proxy
 and is not a supported configuration.
 
+## Plan static analysis
+
+A `.jmx` can execute arbitrary code — JSR223 and BeanShell scripts, the OS
+Process Sampler, JDBC samplers — with whatever privileges the generator holds.
+Generator isolation is the enforcement boundary; static analysis (v0.2) is the
+layer that lets humans and policy act *before* execution:
+
+- `verify` flags risky elements in its report: script samplers, process
+  execution, JDBC, file access.
+- Each organisation sets an **element policy** — allow, warn, or deny per
+  element class. A denied element fails verification and preflight, and the
+  rejection is audited like a target-policy rejection.
+- Analysis is defence-in-depth, not the boundary. A plan that passes it still
+  runs as hostile input inside an isolated generator.
+
 ## Authentication
 
 | Principal | Mechanism |
@@ -60,7 +75,7 @@ and is not a supported configuration.
 | Users | JWT access token (short-lived) + rotating refresh token |
 | CI and automation | API keys, `plim_live_*` / `plim_test_*` |
 | Generator agents | Short-lived, run-scoped token, single run, expires with it |
-| Enterprise (later) | OIDC, SAML, LDAP |
+| Enterprise | OIDC (v0.3); SAML and LDAP (v1.0) |
 
 Passwords use **Argon2id**. API keys are stored as SHA-256 hashes and displayed
 once; a leaked key is revoked, never recovered. Refresh tokens rotate on use, and
