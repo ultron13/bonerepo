@@ -1,0 +1,62 @@
+name: Bug report
+description: Something behaves incorrectly
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not report security vulnerabilities here — see
+        [SECURITY.md](https://github.com/plimsoll/plimsoll/blob/main/SECURITY.md).
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+    validations:
+      required: true
+
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Generator runtime
+      options:
+        - Docker (make dev)
+        - Kubernetes
+        - Not applicable
+    validations:
+      required: true
+
+  - type: textarea
+    id: run-context
+    attributes:
+      label: Run context
+      description: |
+        For anything involving a test run, this is usually what makes it
+        reproducible. Include the run ID, generator count, virtual users,
+        duration, and whether the run was marked degraded.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant API, worker, or agent output. Redact secrets and target hostnames.
+      render: shell

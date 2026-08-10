@@ -1,0 +1,45 @@
+name: Feature request
+description: Propose a capability or change
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that you currently cannot? Describe the situation, not the solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: Where do you think this belongs?
+      description: See the [roadmap](https://github.com/plimsoll/plimsoll/blob/main/docs/roadmap.md).
+      options:
+        - v0.1 — walking skeleton
+        - v0.2 — regression detection
+        - v0.3 — team platform
+        - v0.4 — beyond one engine
+        - v1.0 or later
+        - Not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: adr
+    attributes:
+      label: Decision records
+      options:
+        - label: This would change a decision in `docs/adr/`, and I have said which one above.
