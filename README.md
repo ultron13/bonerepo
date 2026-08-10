@@ -98,8 +98,8 @@ virtual users, and a long test can never block it.
 > is held to.
 
 ```bash
-git clone https://github.com/plimsoll/plimsoll.git
-cd plimsoll
+git clone https://github.com/ultron13/bonerepo.git
+cd bonerepo
 make dev
 ```
 

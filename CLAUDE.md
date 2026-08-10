@@ -88,7 +88,11 @@ not a style preference.
 
 The project is **Plimsoll**. Identifiers use `plimsoll` / `plim`:
 `plimsoll-agent`, CLI `plimsoll`, API keys `plim_live_*`, env prefix
-`PLIMSOLL_`, images `ghcr.io/plimsoll/*`.
+`PLIMSOLL_`, images `ghcr.io/ultron13/*`.
+
+Product identifiers stay `plimsoll` / `plim` regardless of where the code is
+hosted. Only repository and registry references follow the GitHub owner:
+the canonical repository is `github.com/ultron13/bonerepo`.
 
 Plimsoll is an independent implementation. Do not use OpenText, LoadRunner,
 LRE, or VuGen naming in code, identifiers, UI copy, or documentation. Functional

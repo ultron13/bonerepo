@@ -26,7 +26,7 @@ body:
     id: milestone
     attributes:
       label: Where do you think this belongs?
-      description: See the [roadmap](https://github.com/plimsoll/plimsoll/blob/main/docs/roadmap.md).
+      description: See the [roadmap](https://github.com/ultron13/bonerepo/blob/main/docs/roadmap.md).
       options:
         - v0.1 — walking skeleton
         - v0.2 — regression detection

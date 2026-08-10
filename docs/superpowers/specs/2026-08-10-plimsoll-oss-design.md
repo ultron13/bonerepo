@@ -70,8 +70,9 @@ it does), OpenPerf (unbrandable).
 Accepted cost: obscure to most people, so the README tagline must do the
 explaining from line one.
 
-Identifiers: `plimsoll/plimsoll`, `plimsoll-agent`, CLI `plimsoll`, keys
-`plim_live_*`, env `PLIMSOLL_`, images `ghcr.io/plimsoll/*`. All OpenText,
+Identifiers: `plimsoll-agent`, CLI `plimsoll`, keys
+`plim_live_*`, env `PLIMSOLL_`. Repository and registry references follow the
+GitHub owner rather than the product name — see Open items. All OpenText,
 LoadRunner, LRE, and VuGen references removed from code, identifiers, UI copy,
 and docs; a single attribution note in the README states non-affiliation.
 
@@ -193,9 +194,14 @@ costs.
 
 ## Open items
 
-- **Contact addresses.** `CODE_OF_CONDUCT.md` carries a placeholder enforcement
-  address, and `SECURITY.md` assumes GitHub private vulnerability reporting.
-  Both need real values before the repository is made public.
-- **GitHub organisation.** Documents assume `github.com/plimsoll/plimsoll`.
-  Registry and organisation names need claiming, or the references need updating.
+- ~~**Contact addresses.**~~ Resolved: the Code of Conduct enforcement address
+  is set, and `SECURITY.md` uses GitHub private vulnerability reporting on the
+  canonical repository.
+- ~~**GitHub organisation.**~~ Resolved by hosting rather than by claiming: the
+  canonical repository is `github.com/ultron13/bonerepo` and images publish to
+  `ghcr.io/ultron13/*`. The product keeps the name Plimsoll and the
+  `plimsoll` / `plim` identifiers — only repository and registry references
+  follow the owner. Moving to a dedicated `plimsoll` organisation later is a
+  find-and-replace over those references plus a GitHub redirect, not a
+  renaming exercise.
 - **Target policy posture.** See the flagged assumption above.

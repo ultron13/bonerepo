@@ -33,8 +33,8 @@ You need **Docker** and **make**. Nothing else — if you find you need somethin
 else, that is a bug in the setup and worth an issue.
 
 ```bash
-git clone https://github.com/plimsoll/plimsoll.git
-cd plimsoll
+git clone https://github.com/ultron13/bonerepo.git
+cd bonerepo
 make dev        # starts the control plane + demo target, migrates, seeds a demo project
 make test       # unit tests
 ```

@@ -85,7 +85,7 @@ Rules:
 ## Plugin and JMeter-version resolution
 
 Generator images are published per supported JMeter version
-(`ghcr.io/plimsoll/generator:jmeter-5.6.3`), with the common `jpgc-*` set baked
+(`ghcr.io/ultron13/generator:jmeter-5.6.3`), with the common `jpgc-*` set baked
 in at pinned versions. Resolution order for a plugin named in the manifest:
 
 1. Present in the generator image at the pinned version → use it.
@@ -136,7 +136,7 @@ The integration works in both directions:
 
 ## Tooling
 
-- **Template repository** — `plimsoll/jmx-template` is the layout above with a
+- **Template repository** — `ultron13/jmx-template` is the layout above with a
   working plan against the bundled demo target. `plimsoll init` scaffolds the
   same thing into an existing repository.
 - **`plimsoll plan lint`** — planned alongside the v0.2 CLI: the `verify`

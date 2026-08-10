@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Report privately through
-[GitHub private vulnerability reporting](https://github.com/plimsoll/plimsoll/security/advisories/new),
+[GitHub private vulnerability reporting](https://github.com/ultron13/bonerepo/security/advisories/new),
 not in a public issue.
 
 Include what you can: affected component, version or commit, reproduction steps,
