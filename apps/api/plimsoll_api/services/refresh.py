@@ -19,6 +19,15 @@ def _hash(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
+async def organization_for(session: AsyncSession, raw_token: str) -> uuid.UUID | None:
+    """The organisation a presented token belongs to, live or already consumed.
+
+    A consumed token still resolves, because rotating one is the theft signal
+    and revoking its family needs the family to be reachable.
+    """
+    return await repo.organization_for_token(session, _hash(raw_token))
+
+
 async def issue_family(session: AsyncSession, user_id: uuid.UUID, org_id: uuid.UUID) -> str:
     raw = secrets.token_urlsafe(48)
     family_id = uuid.uuid4()

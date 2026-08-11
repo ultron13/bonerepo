@@ -26,6 +26,20 @@ def _session_factory() -> async_sessionmaker[AsyncSession]:
     return async_sessionmaker(get_engine(), expire_on_commit=False)
 
 
+async def bind_session_to_org(session: AsyncSession, org_id: uuid.UUID) -> None:
+    """Scope an already-open transaction to an organisation.
+
+    Login opens anonymously -- it cannot know the organisation until it has
+    resolved the user -- and then has to write a refresh-token family, which is
+    policy-protected. Binding mid-transaction is how the principal it just
+    established takes effect.
+    """
+    await session.execute(
+        text("SELECT set_config('app.current_org_id', :org, true)"),
+        {"org": str(org_id)},
+    )
+
+
 @asynccontextmanager
 async def session_for_org(org_id: uuid.UUID | None) -> AsyncIterator[AsyncSession]:
     """One transaction per request, with the tenant setting applied inside it.

@@ -71,6 +71,18 @@ async def revoke_family_containing(session: AsyncSession, token_hash: str) -> No
     )
 
 
+async def organization_for_token(session: AsyncSession, token_hash: str) -> uuid.UUID | None:
+    """Resolve the organisation of a presented token before any scope is set.
+
+    Goes through the SECURITY DEFINER function: the family and history tables
+    are policy-protected, and a refresh request carries no principal yet.
+    """
+    org_id: uuid.UUID | None = await session.scalar(
+        sa.text("SELECT auth_org_for_refresh(:hash)"), {"hash": token_hash}
+    )
+    return org_id
+
+
 async def record_history(
     session: AsyncSession, family_id: uuid.UUID, org_id: uuid.UUID, token_hash: str
 ) -> None:
