@@ -8,6 +8,9 @@ from sqlalchemy import create_engine
 from plimsoll_api.config import get_settings
 from plimsoll_api.db.base import Base
 
+# Imported for the side effect of registering every table on Base.metadata.
+import plimsoll_api.db.models  # noqa: F401  isort: skip
+
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
