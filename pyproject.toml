@@ -39,6 +39,9 @@ ignore = ["S101"]
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S105", "S106"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["plimsoll_api", "plimsoll_contracts"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
