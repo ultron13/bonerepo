@@ -10,11 +10,11 @@ COPY packages/contracts/python/pyproject.toml packages/contracts/python/
 # Third-party dependencies only. The workspace packages must be skipped here:
 # their source is not copied yet, so an editable build would record a wheel
 # with no path hook and the later sync would consider them already installed.
-RUN uv sync --frozen --no-dev --no-install-workspace
+RUN uv sync --locked --no-dev --no-install-workspace
 
 COPY packages/contracts/python packages/contracts/python
 COPY apps/api apps/api
-RUN uv sync --frozen --no-dev
+RUN uv sync --locked --no-dev
 
 # The runtime user needs a home for uv's cache and ownership of the virtual
 # environment. UV_NO_SYNC keeps `uv run` from re-resolving inside a built
