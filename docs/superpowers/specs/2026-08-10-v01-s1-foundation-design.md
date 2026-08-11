@@ -123,14 +123,14 @@ the function is not written until then.
 
 ## Schema
 
-One reversible `0001_initial` migration creating twenty-three tables, the
-`performance_metrics` hypertable, and a policy on every tenant-reachable table.
-CI applies it against a seeded database and rolls it back, so an irreversible
-migration fails review.
+Twenty-four tables, the `performance_metrics` hypertable, and a policy on every
+tenant-reachable table. Every migration is reversible; CI applies them against
+a seeded database and rolls them back, so an irreversible migration fails
+review.
 
 Twenty tables come from [the data model](../../architecture/04-data-model.md)
 and [the metrics pipeline](../../architecture/03-metrics-pipeline.md) as
-written. Three are additions this design introduces, each closing a gap where a
+written. Four are additions this design introduces, each closing a gap where a
 documented behaviour had nowhere to live:
 
 **`target_policies`** — the API exposes `GET`/`PUT /target-policy` and a run
@@ -166,6 +166,22 @@ CREATE TABLE refresh_token_families (
 );
 ```
 
+**`refresh_token_history`** — revoking a family on *reuse* means recognising a
+token that was valid and is not any more, which the single `current_hash`
+column cannot answer: once rotation overwrites it, the consumed token is
+indistinguishable from one that was never issued. Every hash the family has
+ever held is recorded here, so a presented token that is absent from
+`current_hash` but present in history is a replay rather than a stranger.
+
+```sql
+CREATE TABLE refresh_token_history (
+    token_hash       VARCHAR(128) PRIMARY KEY,
+    family_id        UUID NOT NULL REFERENCES refresh_token_families(id) ON DELETE CASCADE,
+    organization_id  UUID NOT NULL REFERENCES organizations(id),
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
 **`project_run_counters`** — the allocation mechanism for `run_number`, taken
 `FOR UPDATE` inside the run-creation transaction so concurrent starts serialise
 instead of racing `UNIQUE (project_id, run_number)`.
@@ -178,7 +194,7 @@ CREATE TABLE project_run_counters (
 );
 ```
 
-All three carry `organization_id` and a policy, per the rule that no tenant
+All four carry `organization_id` and a policy, per the rule that no tenant
 table depends on a join for its protection.
 
 ## The API spine
