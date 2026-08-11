@@ -21,9 +21,20 @@ def create_app() -> FastAPI:
     app.middleware("http")(request_id_middleware)
     register_error_handlers(app)
 
+    from plimsoll_api.db.session import get_engine
+    from plimsoll_api.readiness import ObjectStoreCheck, PostgresCheck, RedisCheck
     from plimsoll_api.routers import health
+    from plimsoll_api.routers.health import set_readiness_checks
 
     app.include_router(health.router)
+    set_readiness_checks(
+        app,
+        [
+            PostgresCheck(get_engine()),
+            RedisCheck(settings.redis_url),
+            ObjectStoreCheck(settings.s3_endpoint),
+        ],
+    )
     return app
 
 

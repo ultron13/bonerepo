@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="PLIMSOLL_", extra="ignore")
 
     database_url: str
+    # Migrations and the seed connect as the owner; the runtime never does.
+    migration_database_url: str
     redis_url: str
     s3_endpoint: str
     jwt_secret: str

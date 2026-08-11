@@ -1,0 +1,63 @@
+name: plimsoll
+
+services:
+  postgres:
+    image: timescale/timescaledb:2.16.1-pg16
+    environment:
+      POSTGRES_DB: plimsoll
+      POSTGRES_PASSWORD: postgres_dev
+    volumes:
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+      - pgdata:/var/lib/postgresql/data
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d plimsoll"]
+      interval: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:RELEASE.2024-09-13T20-26-02Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: plimsoll
+      MINIO_ROOT_PASSWORD: plimsoll_dev_secret
+    ports: ["9000:9000", "9001:9001"]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/api.Dockerfile
+    environment:
+      PLIMSOLL_DATABASE_URL: postgresql+asyncpg://plimsoll_app:plimsoll_app_dev@postgres:5432/plimsoll
+      PLIMSOLL_MIGRATION_DATABASE_URL: postgresql+asyncpg://plimsoll_owner:plimsoll_owner_dev@postgres:5432/plimsoll
+      PLIMSOLL_REDIS_URL: redis://redis:6379/0
+      PLIMSOLL_S3_ENDPOINT: http://minio:9000
+      PLIMSOLL_JWT_SECRET: development-only-secret-change-me
+      PLIMSOLL_ENVIRONMENT: development
+    ports: ["8000:8000"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      minio: {condition: service_healthy}
+
+  demo-target:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/demo-target.Dockerfile
+    ports: ["8080:8080"]
+
+volumes:
+  pgdata:
