@@ -1,0 +1,10 @@
+# The demo target is a standalone single-file service, deliberately not a
+# member of the uv workspace: it must stay installable from its image alone.
+[project]
+name = "plimsoll-demo-target"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
+]

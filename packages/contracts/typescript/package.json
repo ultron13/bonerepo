@@ -1,0 +1,11 @@
+{
+  "name": "@plimsoll/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/generated.ts",
+  "types": "src/generated.ts",
+  "devDependencies": {
+    "openapi-typescript": "^7.3.0",
+    "typescript": "^5.5.0"
+  }
+}

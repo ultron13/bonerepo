@@ -1,0 +1,62 @@
+[project]
+name = "plimsoll"
+version = "0.1.0"
+requires-python = ">=3.12"
+# The root pins the workspace members so that a bare `uv run` from the
+# repository root can import them, and so `uv sync --no-dev` in the image
+# installs the application without the test and lint toolchain.
+dependencies = [
+    "plimsoll-api",
+    "plimsoll-contracts",
+]
+
+[tool.uv.workspace]
+members = ["apps/api", "packages/contracts/python"]
+
+[tool.uv.sources]
+plimsoll-api = { workspace = true }
+plimsoll-contracts = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "httpx>=0.27",
+    # The synchronous driver keeps the migration and isolation tests simple.
+    "psycopg[binary]>=3.1",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# ruff formats Python code blocks inside Markdown. The specification and plans
+# are authored prose; they are not build inputs and must not be rewritten.
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "S", "RUF"]
+ignore = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S105", "S106"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["plimsoll_api", "plimsoll_contracts"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+# The plugin knows a BaseSettings subclass is populated from the environment,
+# so `Settings()` with no arguments type-checks.
+plugins = ["pydantic.mypy"]
+# The demo target is a standalone single-file service outside the workspace;
+# its test reaches it by path, so mypy needs the same directory.
+mypy_path = ["images/demo-target"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["apps/api/tests"]
+markers = ["integration: requires the make dev stack"]
