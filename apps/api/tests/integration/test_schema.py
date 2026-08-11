@@ -34,6 +34,7 @@ EXPECTED_TABLES = {
     "target_policies",
     "refresh_token_families",
     "project_run_counters",
+    "refresh_token_history",
 }
 
 
