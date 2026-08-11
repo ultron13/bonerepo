@@ -19,7 +19,9 @@ format:
 dev:
 	$(COMPOSE) up --build -d
 	$(COMPOSE) exec -T api uv run alembic -c apps/api/alembic.ini upgrade head
+	$(COMPOSE) exec -T api uv run python -m plimsoll_api.seed
 	@echo "Plimsoll is up. API http://localhost:8000  demo target http://localhost:8080"
+	@echo "Sign in with admin@demo.plimsoll.dev / plimsoll-demo-password"
 
 dev-down:
 	$(COMPOSE) down -v
