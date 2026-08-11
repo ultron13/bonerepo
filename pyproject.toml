@@ -1,0 +1,50 @@
+[project]
+name = "plimsoll"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv.workspace]
+members = ["apps/api", "packages/contracts/python"]
+
+[tool.uv.sources]
+plimsoll-api = { workspace = true }
+plimsoll-contracts = { workspace = true }
+
+[dependency-groups]
+# The workspace members are dev dependencies of the root so that a bare
+# `uv run` from the repository root can import them. The root project itself
+# ships nothing.
+dev = [
+    "plimsoll-api",
+    "plimsoll-contracts",
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "httpx>=0.27",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# ruff formats Python code blocks inside Markdown. The specification and plans
+# are authored prose; they are not build inputs and must not be rewritten.
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "S", "RUF"]
+ignore = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S105", "S106"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["apps/api/tests"]
+markers = ["integration: requires the make dev stack"]
