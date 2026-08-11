@@ -20,6 +20,10 @@ def create_app() -> FastAPI:
     )
     app.middleware("http")(request_id_middleware)
     register_error_handlers(app)
+
+    from plimsoll_api.routers import health
+
+    app.include_router(health.router)
     return app
 
 
