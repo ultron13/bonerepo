@@ -1,4 +1,4 @@
-.PHONY: test lint typecheck format dev dev-down test-int
+.PHONY: test lint typecheck format dev dev-down test-int contracts
 
 UV := uv run
 COMPOSE := docker compose -f infrastructure/docker/docker-compose.yml
@@ -28,3 +28,15 @@ dev-down:
 
 test-int:
 	$(UV) pytest apps/api/tests/integration -v -m integration
+
+# Generation runs in a container, so the Docker-and-make-only promise holds.
+# Both containers run as the invoking user, so the output is not root-owned.
+contracts:
+	$(COMPOSE) exec -T api uv run python -c \
+	  "import json, plimsoll_api.main as m; print(json.dumps(m.app.openapi()))" \
+	  > /tmp/plimsoll-openapi.json
+	docker run --rm -u "$$(id -u):$$(id -g)" -e HOME=/tmp -e npm_config_cache=/tmp/.npm \
+	  -v "$$PWD:/w" -v /tmp:/host-tmp -w /w node:20-alpine sh -c \
+	  "mkdir -p packages/contracts/typescript/src && \
+	   npx --yes openapi-typescript@7 /host-tmp/plimsoll-openapi.json \
+	   -o packages/contracts/typescript/src/generated.ts"
