@@ -49,6 +49,9 @@ warn_unreachable = true
 # The plugin knows a BaseSettings subclass is populated from the environment,
 # so `Settings()` with no arguments type-checks.
 plugins = ["pydantic.mypy"]
+# The demo target is a standalone single-file service outside the workspace;
+# its test reaches it by path, so mypy needs the same directory.
+mypy_path = ["images/demo-target"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

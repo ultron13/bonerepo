@@ -10,7 +10,7 @@ lint:
 	$(UV) ruff format --check .
 
 typecheck:
-	$(UV) mypy apps packages
+	$(UV) mypy apps packages images
 
 format:
 	$(UV) ruff format .
