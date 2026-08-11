@@ -46,6 +46,9 @@ known-first-party = ["plimsoll_api", "plimsoll_contracts"]
 python_version = "3.12"
 strict = true
 warn_unreachable = true
+# The plugin knows a BaseSettings subclass is populated from the environment,
+# so `Settings()` with no arguments type-checks.
+plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
