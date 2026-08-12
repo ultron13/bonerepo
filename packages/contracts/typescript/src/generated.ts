@@ -161,6 +161,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/generator-pools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Pools */
+        get: operations["list_pools_api_v1_generator_pools_get"];
+        put?: never;
+        /** Create Pool */
+        post: operations["create_pool_api_v1_generator_pools_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/generator-pools/{pool_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Pool */
+        get: operations["get_pool_api_v1_generator_pools__pool_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Pool */
+        delete: operations["delete_pool_api_v1_generator_pools__pool_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Pool */
+        patch: operations["update_pool_api_v1_generator_pools__pool_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -229,12 +266,88 @@ export interface components {
             /** Nextcursor */
             nextCursor?: string | null;
         };
+        /** Page[PoolResponse] */
+        Page_PoolResponse_: {
+            /** Items */
+            items: components["schemas"]["PoolResponse"][];
+            /** Nextcursor */
+            nextCursor?: string | null;
+        };
         /** Page[ProjectResponse] */
         Page_ProjectResponse_: {
             /** Items */
             items: components["schemas"]["ProjectResponse"][];
             /** Nextcursor */
             nextCursor?: string | null;
+        };
+        /** PoolCreate */
+        PoolCreate: {
+            /** Name */
+            name: string;
+            runtime: components["schemas"]["PoolRuntime"];
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            };
+            /** Region */
+            region?: string | null;
+            /** Maxgenerators */
+            maxGenerators: number;
+            /** Maxvuspergenerator */
+            maxVusPerGenerator: number;
+        };
+        /** PoolResponse */
+        PoolResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Runtime */
+            runtime: string;
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /** Region */
+            region: string | null;
+            /** Maxgenerators */
+            maxGenerators: number;
+            /** Maxvuspergenerator */
+            maxVusPerGenerator: number;
+            /** Capacity */
+            capacity: number;
+            /** Supportedengines */
+            supportedEngines: string[];
+            /** Status */
+            status: string;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+        };
+        /**
+         * PoolRuntime
+         * @enum {string}
+         */
+        PoolRuntime: "docker" | "kubernetes";
+        /** PoolUpdate */
+        PoolUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            } | null;
+            /** Region */
+            region?: string | null;
+            /** Maxgenerators */
+            maxGenerators?: number | null;
+            /** Maxvuspergenerator */
+            maxVusPerGenerator?: number | null;
         };
         /** ProjectCreate */
         ProjectCreate: {
@@ -690,6 +803,166 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_pools_api_v1_generator_pools_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_PoolResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_pool_api_v1_generator_pools_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PoolCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoolResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_pool_api_v1_generator_pools__pool_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pool_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoolResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_pool_api_v1_generator_pools__pool_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pool_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_pool_api_v1_generator_pools__pool_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pool_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PoolUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoolResponse"];
+                };
             };
             /** @description Validation Error */
             422: {

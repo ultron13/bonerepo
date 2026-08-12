@@ -30,6 +30,9 @@ DEMO_USERS = [
 # works because it ships its own permitted target, not because the check is
 # soft.
 DEMO_ALLOWLIST = '["demo-target"]'
+# Two generators of 500 users each: enough for the demo test to pass preflight,
+# small enough to run on a laptop. S3 gives the runtime meaning.
+DEMO_POOL_CONFIG = '{"image": "ghcr.io/ultron13/generator:jmeter-5.6.3"}'
 
 
 async def seed() -> None:
@@ -73,6 +76,17 @@ async def seed() -> None:
                 "ON CONFLICT (organization_id, project_key) DO NOTHING"
             ),
             {"id": uuid.uuid4(), "org": DEMO_ORG_ID},
+        )
+
+        await connection.execute(
+            sa.text(
+                "INSERT INTO generator_pools "
+                "(id, organization_id, name, runtime, config, max_generators, "
+                " max_vus_per_generator) "
+                "VALUES (:id, :org, 'local-docker', 'docker', CAST(:config AS jsonb), 2, 500) "
+                "ON CONFLICT (organization_id, name) DO NOTHING"
+            ),
+            {"id": uuid.uuid4(), "org": DEMO_ORG_ID, "config": DEMO_POOL_CONFIG},
         )
 
         await connection.execute(
