@@ -52,7 +52,9 @@ repurposed. The v0.1 catalogue:
 | `UNAUTHENTICATED` | 401 | Missing or invalid credentials |
 | `PERMISSION_DENIED` | 403 | Authenticated, but not permitted to do this |
 | `NOT_FOUND` | 404 | Absent — or outside the caller's organisation, indistinguishable by design |
-| `CONFLICT` | 409 | Optimistic-lock `version` mismatch on a concurrent edit |
+| `METHOD_NOT_ALLOWED` | 405 | The path exists, but not for this method |
+| `CONFLICT` | 409 | Optimistic-lock `version` mismatch on a concurrent edit, or a uniqueness clash |
+| `RESOURCE_IN_USE` | 409 | Another resource references this one and it cannot be deleted; `details` names the referents |
 | `IDEMPOTENCY_KEY_REUSED` | 409 | Same `Idempotency-Key`, different payload |
 | `TEST_NOT_RUNNABLE` | 422 | Preflight failed; `details` carries every failing check |
 | `TARGET_NOT_ALLOWED` | 422 | A resolved target host is outside the organisation's allowlist |
@@ -101,6 +103,19 @@ GET    /projects/{id}
 PATCH  /projects/{id}
 DELETE /projects/{id}
 ```
+
+### Credentials
+```http
+GET    /credentials
+POST   /credentials
+DELETE /credentials/{id}
+```
+
+A credential is written once and never read back: the response carries id,
+name, kind, and creation time, and no endpoint returns the secret. There is
+deliberately no `GET /credentials/{id}` — a per-credential read is where a
+"reveal" parameter would eventually be added. Deleting one that a script
+repository still references returns `RESOURCE_IN_USE`.
 
 ### Script repositories
 ```http
