@@ -6,8 +6,9 @@ addresses the compose stack publishes on the host.
 """
 
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 
+import httpx
 import pytest
 
 os.environ["PLIMSOLL_DATABASE_URL"] = os.environ.get(
@@ -39,3 +40,30 @@ async def _dispose_pooled_connections() -> AsyncIterator[None]:
     """
     yield
     await db_session.get_engine().dispose()
+
+
+API_URL = os.environ.get("PLIMSOLL_TEST_API_URL", "http://localhost:8000")
+ADMIN = {"email": "admin@demo.plimsoll.dev", "password": "plimsoll-demo-password"}
+VIEWER = {"email": "viewer@demo.plimsoll.dev", "password": "plimsoll-demo-password"}
+
+
+def _signed_in(account: dict[str, str]) -> Iterator[httpx.Client]:
+    """Signing in happens inside the context manager.
+
+    A client is opened implicitly by its first request, and opening it again by
+    entering `with` afterwards raises.
+    """
+    with httpx.Client(base_url=API_URL, timeout=30) as client:
+        token = client.post("/api/v1/auth/login", json=account).json()["accessToken"]
+        client.headers["Authorization"] = f"Bearer {token}"
+        yield client
+
+
+@pytest.fixture
+def admin_client() -> Iterator[httpx.Client]:
+    yield from _signed_in(ADMIN)
+
+
+@pytest.fixture
+def viewer_client() -> Iterator[httpx.Client]:
+    yield from _signed_in(VIEWER)

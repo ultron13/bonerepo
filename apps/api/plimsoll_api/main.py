@@ -23,11 +23,12 @@ def create_app() -> FastAPI:
 
     from plimsoll_api.db.session import get_engine
     from plimsoll_api.readiness import ObjectStoreCheck, PostgresCheck, RedisCheck
-    from plimsoll_api.routers import auth, health
+    from plimsoll_api.routers import auth, health, projects
     from plimsoll_api.routers.health import set_readiness_checks
 
     app.include_router(health.router)
     app.include_router(auth.router)
+    app.include_router(projects.router)
     set_readiness_checks(
         app,
         [
