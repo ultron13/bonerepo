@@ -253,6 +253,28 @@ export interface paths {
         patch: operations["update_script_repo_api_v1_script_repos__repo_id__patch"];
         trace?: never;
     };
+    "/api/v1/script-repos/{repo_id}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Script Repo
+         * @description Requires SCRIPT_WRITE rather than a read permission: it makes the
+         *     platform reach a third-party host on the caller's behalf, which is a side
+         *     effect a read-only principal should not be able to trigger.
+         */
+        post: operations["verify_script_repo_api_v1_script_repos__repo_id__verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -286,6 +308,21 @@ export interface components {
              */
             createdAt: string;
         };
+        /** Finding */
+        Finding: {
+            /** Code */
+            code: string;
+            severity: components["schemas"]["FindingSeverity"];
+            /** Message */
+            message: string;
+            /** Location */
+            location?: string | null;
+        };
+        /**
+         * FindingSeverity
+         * @enum {string}
+         */
+        FindingSeverity: "ERROR" | "WARNING";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -341,6 +378,39 @@ export interface components {
             items: components["schemas"]["ScriptRepoResponse"][];
             /** Nextcursor */
             nextCursor?: string | null;
+        };
+        /** PlanSummaryResponse */
+        PlanSummaryResponse: {
+            /** Threadgroups */
+            threadGroups: string[];
+            /** Transactioncontrollers */
+            transactionControllers: string[];
+            /** Timers */
+            timers: string[];
+            /** Variables */
+            variables: string[];
+            /** Datafiles */
+            dataFiles: string[];
+            /** Targets */
+            targets: components["schemas"]["PlanTargetResponse"][];
+        };
+        /** PlanTargetResponse */
+        PlanTargetResponse: {
+            /** Scheme */
+            scheme: string;
+            /** Host */
+            host: string;
+            /** Port */
+            port: number | null;
+        };
+        /** PluginSummary */
+        PluginSummary: {
+            /** Id */
+            id: string;
+            /** Version */
+            version: string;
+            /** Sha256 */
+            sha256: string;
         };
         /** PoolCreate */
         PoolCreate: {
@@ -567,6 +637,20 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VerifyReport */
+        VerifyReport: {
+            /** Ok */
+            ok: boolean;
+            /** Commitsha */
+            commitSha?: string | null;
+            /** Ref */
+            ref: string;
+            /** Findings */
+            findings?: components["schemas"]["Finding"][];
+            plan?: components["schemas"]["PlanSummaryResponse"] | null;
+            /** Plugins */
+            plugins?: components["schemas"]["PluginSummary"][];
         };
     };
     responses: never;
@@ -1319,6 +1403,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScriptRepoResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_script_repo_api_v1_script_repos__repo_id__verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifyReport"];
                 };
             };
             /** @description Validation Error */

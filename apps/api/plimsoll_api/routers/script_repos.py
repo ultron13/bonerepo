@@ -13,16 +13,20 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Response
 
+from plimsoll_api.db.session import session_for_org
 from plimsoll_api.dependencies import CurrentPrincipal, TenantSession
 from plimsoll_api.pagination import page_of, position_from
 from plimsoll_api.repositories import script_repos as repo
 from plimsoll_api.security.permissions import Permission, requires
+from plimsoll_api.services import audit
 from plimsoll_api.services import script_repos as service
+from plimsoll_api.services import verify as verify_service
 from plimsoll_contracts.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, Page
 from plimsoll_contracts.scripts import (
     ScriptRepoCreate,
     ScriptRepoResponse,
     ScriptRepoUpdate,
+    VerifyReport,
 )
 
 router = APIRouter(tags=["scripts"])
@@ -111,4 +115,29 @@ async def delete_script_repo(
     return Response(status_code=204)
 
 
-# POST /api/v1/script-repos/{repo_id}/verify follows in the next commit.
+@router.post(
+    "/api/v1/script-repos/{repo_id}/verify",
+    response_model=VerifyReport,
+    dependencies=[Depends(requires(Permission.SCRIPT_WRITE))],
+)
+async def verify_script_repo(repo_id: uuid.UUID, principal: CurrentPrincipal) -> VerifyReport:
+    """Requires SCRIPT_WRITE rather than a read permission: it makes the
+    platform reach a third-party host on the caller's behalf, which is a side
+    effect a read-only principal should not be able to trigger."""
+    async with session_for_org(principal.organization_id) as session:
+        row = await service.require(session, repo_id)
+        access = await service.access_for(session, row)
+        plan_path, ref = row.plan_path, row.default_ref
+
+    report = await verify_service.run(access, plan_path, ref)
+
+    async with session_for_org(principal.organization_id) as session:
+        await audit.record(
+            session,
+            principal=principal,
+            action="script_repo.verified",
+            entity_type="script_repo",
+            entity_id=repo_id,
+            metadata={"ok": report.ok, "commitSha": report.commit_sha},
+        )
+    return report

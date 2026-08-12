@@ -6,6 +6,7 @@ addresses the compose stack publishes on the host.
 """
 
 import os
+import uuid
 from collections.abc import AsyncIterator, Iterator
 
 import httpx
@@ -67,3 +68,13 @@ def admin_client() -> Iterator[httpx.Client]:
 @pytest.fixture
 def viewer_client() -> Iterator[httpx.Client]:
     yield from _signed_in(VIEWER)
+
+
+@pytest.fixture
+def admin_org(admin_client: httpx.Client) -> uuid.UUID:
+    """The signed-in organisation, resolved before the test body runs.
+
+    An async test that called the synchronous client itself would block the
+    loop it is running on.
+    """
+    return uuid.UUID(admin_client.get("/api/v1/auth/me").json()["organizationId"])
