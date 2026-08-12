@@ -275,6 +275,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/script-repos/{repo_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Versions */
+        get: operations["list_versions_api_v1_script_repos__repo_id__versions_get"];
+        put?: never;
+        /** Pin Version */
+        post: operations["pin_version_api_v1_script_repos__repo_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/script-versions/{version_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Version */
+        get: operations["get_version_api_v1_script_versions__version_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -376,6 +411,13 @@ export interface components {
         Page_ScriptRepoResponse_: {
             /** Items */
             items: components["schemas"]["ScriptRepoResponse"][];
+            /** Nextcursor */
+            nextCursor?: string | null;
+        };
+        /** Page[ScriptVersionResponse] */
+        Page_ScriptVersionResponse_: {
+            /** Items */
+            items: components["schemas"]["ScriptVersionResponse"][];
             /** Nextcursor */
             nextCursor?: string | null;
         };
@@ -598,6 +640,36 @@ export interface components {
             defaultRef?: string | null;
             /** Credentialid */
             credentialId?: string | null;
+        };
+        /** ScriptVersionCreate */
+        ScriptVersionCreate: {
+            /** Ref */
+            ref?: string | null;
+        };
+        /** ScriptVersionResponse */
+        ScriptVersionResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Scriptrepoid
+             * Format: uuid
+             */
+            scriptRepoId: string;
+            /** Commitsha */
+            commitSha: string;
+            /** Planpath */
+            planPath: string;
+            /** Checksum */
+            checksum: string | null;
+            planSummary?: components["schemas"]["PlanSummaryResponse"] | null;
+            /**
+             * Resolvedat
+             * Format: date-time
+             */
+            resolvedAt: string;
         };
         /** TargetPolicyResponse */
         TargetPolicyResponse: {
@@ -1434,6 +1506,106 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VerifyReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_versions_api_v1_script_repos__repo_id__versions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                repo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ScriptVersionResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pin_version_api_v1_script_repos__repo_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScriptVersionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptVersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_version_api_v1_script_versions__version_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptVersionResponse"];
                 };
             };
             /** @description Validation Error */

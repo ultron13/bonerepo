@@ -120,4 +120,9 @@ class ScriptVersionResponse(BaseModel):
     commit_sha: str = Field(serialization_alias="commitSha")
     plan_path: str = Field(serialization_alias="planPath")
     checksum: str | None
+    # What the plan contained at this commit, stored when it was pinned so
+    # preflight and the workload editor need not clone again.
+    plan_summary: PlanSummaryResponse | None = Field(
+        default=None, serialization_alias="planSummary"
+    )
     resolved_at: datetime = Field(serialization_alias="resolvedAt")

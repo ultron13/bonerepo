@@ -24,16 +24,29 @@ def position_from(cursor: str | None) -> Position | None:
         return None
     try:
         payload = decode_cursor(cursor)
-        return datetime.fromisoformat(payload["createdAt"]), uuid.UUID(payload["id"])
+        return datetime.fromisoformat(payload["at"]), uuid.UUID(payload["id"])
     except (ValueError, KeyError, TypeError) as exc:
         raise PlimsollError(ErrorCode.VALIDATION_FAILED, "The cursor is malformed.") from exc
 
 
-def page_of[T](rows: Sequence[Any], limit: int, present: Callable[[Any], T]) -> Page[T]:
-    """`rows` holds up to limit + 1 rows; the extra one proves there is more."""
+def page_of[T](
+    rows: Sequence[Any],
+    limit: int,
+    present: Callable[[Any], T],
+    *,
+    timestamp: str = "created_at",
+) -> Page[T]:
+    """`rows` holds up to limit + 1 rows; the extra one proves there is more.
+
+    `timestamp` names the ordering column, which is not `created_at` on every
+    table -- script_versions records `resolved_at`. The cursor key stays
+    neutral so a client never sees which column a collection sorts on.
+    """
     visible = list(rows[:limit])
     next_cursor = None
     if len(rows) > limit and visible:
         last = visible[-1]
-        next_cursor = encode_cursor({"createdAt": last.created_at.isoformat(), "id": str(last.id)})
+        next_cursor = encode_cursor(
+            {"at": getattr(last, timestamp).isoformat(), "id": str(last.id)}
+        )
     return Page(items=[present(row) for row in visible], next_cursor=next_cursor)
