@@ -198,6 +198,24 @@ export interface paths {
         patch: operations["update_pool_api_v1_generator_pools__pool_id__patch"];
         trace?: never;
     };
+    "/api/v1/target-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Target Policy */
+        get: operations["get_target_policy_api_v1_target_policy_get"];
+        /** Replace Target Policy */
+        put: operations["replace_target_policy_api_v1_target_policy_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -402,6 +420,20 @@ export interface components {
             environment?: string | null;
             /** Tags */
             tags?: string[] | null;
+        };
+        /** TargetPolicyResponse */
+        TargetPolicyResponse: {
+            /** Version */
+            version: number;
+            /** Allowlist */
+            allowlist: string[];
+            /** Createdat */
+            createdAt?: string | null;
+        };
+        /** TargetPolicyUpdate */
+        TargetPolicyUpdate: {
+            /** Allowlist */
+            allowlist: string[];
         };
         /** TokenResponse */
         TokenResponse: {
@@ -962,6 +994,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PoolResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_target_policy_api_v1_target_policy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TargetPolicyResponse"];
+                };
+            };
+        };
+    };
+    replace_target_policy_api_v1_target_policy_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetPolicyUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TargetPolicyResponse"];
                 };
             };
             /** @description Validation Error */
