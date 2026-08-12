@@ -54,6 +54,19 @@ services:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
       minio: {condition: service_healthy}
+      script-fixture: {condition: service_healthy}
+
+  script-fixture:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/script-fixture.Dockerfile
+    ports: ["8081:80"]
+    healthcheck:
+      # 127.0.0.1, not localhost: nginx listens on IPv4 and localhost resolves
+      # to ::1 first, which would fail a healthy container.
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/public/plans.git/info/refs?service=git-upload-pack"]
+      interval: 3s
+      retries: 20
 
   demo-target:
     build:

@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from plimsoll_api.config import get_settings
 from plimsoll_api.security.passwords import hash_password
+from plimsoll_api.security.secrets import get_key_provider
 
 DEMO_SLUG = "demo"
 DEMO_ORG_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "demo.plimsoll.dev")
@@ -33,6 +34,12 @@ DEMO_ALLOWLIST = '["demo-target"]'
 # Two generators of 500 users each: enough for the demo test to pass preflight,
 # small enough to run on a laptop. S3 gives the runtime meaning.
 DEMO_POOL_CONFIG = '{"image": "ghcr.io/ultron13/generator:jmeter-5.6.3"}'
+# The fixture's Basic-auth password. A development fixture, not a secret.
+FIXTURE_TOKEN = "plimsoll:plimsoll-fixture-token"  # noqa: S105 - development seed only
+FIXTURE_REPO_URL = "http://script-fixture/private/plans.git"
+# The demo plan reaches ${API_HOST}; preflight resolves it from this variable
+# and checks the result against the allowlist.
+DEMO_API_HOST = "demo-target"
 
 
 async def seed() -> None:
@@ -87,6 +94,43 @@ async def seed() -> None:
                 "ON CONFLICT (organization_id, name) DO NOTHING"
             ),
             {"id": uuid.uuid4(), "org": DEMO_ORG_ID, "config": DEMO_POOL_CONFIG},
+        )
+
+        for name, secret in (
+            ("fixture-git-token", FIXTURE_TOKEN),
+            ("API_HOST", DEMO_API_HOST),
+        ):
+            ciphertext, key_ref = get_key_provider().encrypt(secret.encode())
+            await connection.execute(
+                sa.text(
+                    "INSERT INTO credentials "
+                    "(id, organization_id, name, kind, ciphertext, key_ref) "
+                    "VALUES (:id, :org, :name, :kind, :ciphertext, :key_ref) "
+                    "ON CONFLICT (organization_id, name) DO NOTHING"
+                ),
+                {
+                    "id": uuid.uuid4(),
+                    "org": DEMO_ORG_ID,
+                    "name": name,
+                    "kind": "GIT_TOKEN" if name == "fixture-git-token" else "VARIABLE",
+                    "ciphertext": ciphertext,
+                    "key_ref": key_ref,
+                },
+            )
+
+        await connection.execute(
+            sa.text(
+                "INSERT INTO script_repos "
+                "(id, organization_id, project_id, name, repo_url, default_ref, plan_path, "
+                " credential_id) "
+                "SELECT :id, :org, p.id, 'Demo checkout plan', :url, 'main', "
+                "       'perf/checkout.jmx', c.id "
+                "FROM projects p, credentials c "
+                "WHERE p.project_key = 'DEMO' AND c.name = 'fixture-git-token' "
+                "  AND NOT EXISTS "
+                "      (SELECT 1 FROM script_repos WHERE name = 'Demo checkout plan')"
+            ),
+            {"id": uuid.uuid4(), "org": DEMO_ORG_ID, "url": FIXTURE_REPO_URL},
         )
 
         await connection.execute(
