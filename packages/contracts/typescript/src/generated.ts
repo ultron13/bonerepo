@@ -216,6 +216,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/script-repos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Script Repos */
+        get: operations["list_script_repos_api_v1_projects__project_id__script_repos_get"];
+        put?: never;
+        /** Create Script Repo */
+        post: operations["create_script_repo_api_v1_projects__project_id__script_repos_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/script-repos/{repo_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Script Repo */
+        get: operations["get_script_repo_api_v1_script_repos__repo_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Script Repo */
+        delete: operations["delete_script_repo_api_v1_script_repos__repo_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Script Repo */
+        patch: operations["update_script_repo_api_v1_script_repos__repo_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -295,6 +332,13 @@ export interface components {
         Page_ProjectResponse_: {
             /** Items */
             items: components["schemas"]["ProjectResponse"][];
+            /** Nextcursor */
+            nextCursor?: string | null;
+        };
+        /** Page[ScriptRepoResponse] */
+        Page_ScriptRepoResponse_: {
+            /** Items */
+            items: components["schemas"]["ScriptRepoResponse"][];
             /** Nextcursor */
             nextCursor?: string | null;
         };
@@ -420,6 +464,70 @@ export interface components {
             environment?: string | null;
             /** Tags */
             tags?: string[] | null;
+        };
+        /** ScriptRepoCreate */
+        ScriptRepoCreate: {
+            /** Name */
+            name: string;
+            /** Repourl */
+            repoUrl: string;
+            /** Planpath */
+            planPath: string;
+            /**
+             * Defaultref
+             * @default main
+             */
+            defaultRef: string;
+            /** Credentialid */
+            credentialId?: string | null;
+        };
+        /** ScriptRepoResponse */
+        ScriptRepoResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Projectid
+             * Format: uuid
+             */
+            projectId: string;
+            /** Name */
+            name: string;
+            /** Engine */
+            engine: string;
+            /** Repourl */
+            repoUrl: string;
+            /** Defaultref */
+            defaultRef: string;
+            /** Planpath */
+            planPath: string;
+            /** Credentialid */
+            credentialId: string | null;
+            /** Status */
+            status: string;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /**
+             * Updatedat
+             * Format: date-time
+             */
+            updatedAt: string;
+        };
+        /** ScriptRepoUpdate */
+        ScriptRepoUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Planpath */
+            planPath?: string | null;
+            /** Defaultref */
+            defaultRef?: string | null;
+            /** Credentialid */
+            credentialId?: string | null;
         };
         /** TargetPolicyResponse */
         TargetPolicyResponse: {
@@ -1047,6 +1155,170 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TargetPolicyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_script_repos_api_v1_projects__project_id__script_repos_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ScriptRepoResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_script_repo_api_v1_projects__project_id__script_repos_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScriptRepoCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptRepoResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_script_repo_api_v1_script_repos__repo_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptRepoResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_script_repo_api_v1_script_repos__repo_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_script_repo_api_v1_script_repos__repo_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScriptRepoUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptRepoResponse"];
                 };
             };
             /** @description Validation Error */
