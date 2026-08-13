@@ -25,6 +25,7 @@ Prerequisite: S2 — projects, credentials, pools, target policy, script repos, 
 ```
 apps/api/plimsoll_api/
   messaging.py                     MessageBus, Delivery, RedisStreamBus, announce/listen
+  allocation.py                    Pure: users across generators
   repositories/runs.py             test_runs and run_generators
   services/runs.py                 Creation, snapshot, transitions, stop/cancel
   services/preflight.py            (modified) gather() and assess() extracted
@@ -35,7 +36,6 @@ apps/api/plimsoll_api/
 apps/worker/
   pyproject.toml
   plimsoll_worker/__init__.py __main__.py
-  plimsoll_worker/allocation.py    Pure: users across generators
   plimsoll_worker/reconciler.py    Pure decision + impure application
   plimsoll_worker/runtime/base.py  GeneratorRuntime, ExecutionPlan, GeneratorHandle
   plimsoll_worker/runtime/docker.py DockerRuntime
@@ -52,8 +52,10 @@ infrastructure/docker/
 apps/api/tests/integration/
   test_messaging.py test_runs_api.py test_agent_channel.py
   test_run_execution.py test_run_failure.py
+apps/api/tests/unit/
+  test_allocation.py
 apps/worker/tests/unit/
-  test_allocation.py test_reconciler.py
+  test_reconciler.py
 apps/worker/tests/integration/
   test_docker_runtime.py
 ```
@@ -1079,7 +1081,7 @@ async def require(session: AsyncSession, run_id: uuid.UUID) -> Any:
 
 - [ ] **Step 8: Write the router**
 
-`apps/api/plimsoll_api/routers/runs.py`. Allocation is imported from the worker package — it is pure arithmetic and both processes must agree on it, so it has exactly one implementation:
+`apps/api/plimsoll_api/routers/runs.py`. Allocation is imported from `plimsoll_api.allocation` — pure arithmetic that the API and the worker must agree on, so it has exactly one implementation:
 
 ```python
 from __future__ import annotations
@@ -1103,7 +1105,7 @@ from plimsoll_contracts.errors import ErrorCode
 from plimsoll_contracts.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, Page
 from plimsoll_contracts.performance_tests import WorkloadSpec
 from plimsoll_contracts.runs import GeneratorView, RunResponse, RunStatusResponse
-from plimsoll_worker.allocation import CapacityError, allocate
+from plimsoll_api.allocation import CapacityError, allocate
 
 router = APIRouter(tags=["runs"])
 
@@ -1251,7 +1253,7 @@ Register it in `main.py` beside the others, importing `runs` in the router impor
 
 - [ ] **Step 9: Run the tests and make sure they pass**
 
-This task depends on `plimsoll_worker.allocation` from Task 4. Do Task 4 first if working strictly in order, or write `allocate` now and let Task 4 add its tests.
+This task depends on `plimsoll_api.allocation` from Task 4, which is executed before this one.
 
 Run: `uv run pytest apps/api/tests/integration/test_runs_api.py -v -m integration`
 Expected: PASS — eight tests. A run stays `QUEUED` because nothing consumes the stream yet, which is what the status assertions allow for.
@@ -1269,23 +1271,28 @@ git commit -s -m "feat(api): runs, pinned to the commit preflight resolved"
 ### Task 4: Allocation
 
 **Files:**
-- Create: `apps/worker/pyproject.toml`, `apps/worker/plimsoll_worker/__init__.py`, `apps/worker/plimsoll_worker/allocation.py`, `apps/worker/tests/__init__.py`, `apps/worker/tests/unit/__init__.py`, `apps/worker/tests/unit/test_allocation.py`
+- Create: `apps/api/plimsoll_api/allocation.py`, `apps/api/tests/unit/test_allocation.py`, `apps/worker/pyproject.toml`, `apps/worker/plimsoll_worker/__init__.py`, `apps/worker/tests/__init__.py`, `apps/worker/tests/unit/__init__.py`
 - Modify: `pyproject.toml` (workspace member, testpaths), `Makefile` (`test` target)
-- Test: `apps/worker/tests/unit/test_allocation.py`
+- Test: `apps/api/tests/unit/test_allocation.py`
 
 **Interfaces:**
-- Produces: `allocate(*, total_users, max_generators, max_vus_per_generator) -> list[int]`, `CapacityError`.
+- Produces: `plimsoll_api.allocation.allocate(*, total_users, max_generators, max_vus_per_generator) -> list[int]`, `CapacityError`.
+
+The allocator lives in `plimsoll_api` even though the worker is its busiest
+caller. Both processes must agree on how many generators a run gets, and every
+other dependency in this slice runs worker to api -- putting it in the worker
+would make the API import the worker package and stop the two being separable.
 
 - [ ] **Step 1: Write the failing test**
 
-`apps/worker/tests/unit/test_allocation.py`:
+`apps/api/tests/unit/test_allocation.py`:
 
 ```python
 """Virtual users across generators. The totals must reconcile exactly."""
 
 import pytest
 
-from plimsoll_worker.allocation import CapacityError, allocate
+from plimsoll_api.allocation import CapacityError, allocate
 
 
 def test_an_even_split() -> None:
@@ -1357,12 +1364,12 @@ test:
 	$(UV) pytest apps/api/tests/unit apps/worker/tests/unit -v
 ```
 
-Run `uv sync` and then the test: `uv run pytest apps/worker/tests/unit/test_allocation.py -v`
-Expected: FAIL — `ModuleNotFoundError: plimsoll_worker.allocation`.
+Run `uv sync` and then the test: `uv run pytest apps/api/tests/unit/test_allocation.py -v`
+Expected: FAIL — `ModuleNotFoundError: plimsoll_api.allocation`.
 
 - [ ] **Step 3: Write the allocator**
 
-`apps/worker/plimsoll_worker/allocation.py`:
+`apps/api/plimsoll_api/allocation.py`:
 
 ```python
 """How many generators, and how many virtual users on each.
@@ -1405,7 +1412,7 @@ def allocate(
 
 - [ ] **Step 4: Run the tests and make sure they pass**
 
-Run: `uv run pytest apps/worker/tests/unit/test_allocation.py -v`
+Run: `uv run pytest apps/api/tests/unit/test_allocation.py -v`
 Expected: PASS — seven tests. `test_every_allocation_sums_to_the_request` is the one that matters; it is a property over 199 cases rather than three examples.
 
 - [ ] **Step 5: Commit**
@@ -3453,6 +3460,6 @@ git commit -s -m "feat(api): pool connectivity, and the S3a journey documented"
 ## Self-review notes
 
 - **The duplicate-delivery test** named in the design's testing section is covered by `test_a_run_whose_generators_exist_is_not_provisioned_again` at the unit level and by the conditional `QUEUED → ALLOCATING` transition at the integration level. If you want the end-to-end version, publish the same message twice with `redis-cli XADD` and assert the container count; it is worth the ten lines.
-- **Task 3 depends on Task 4** for `allocate`. Either do Task 4 first, or write `allocation.py` inside Task 3 and let Task 4 add the tests. The plan is ordered for reading, not for a strict dependency walk.
+- **Task 3 depends on Task 4** for `allocate`, so Task 4 is executed first. The plan is ordered for reading, not for a strict dependency walk.
 - **`test-connection` goes through the bus** rather than giving the API a Docker socket. Handing root-equivalent host access to the process that serves untrusted requests, in order to answer a diagnostic, is a bad trade. The cost is a request/reply over Redis with a short timeout, and a clear answer when no worker replies.
 - **The design's `summary` is minimal in S3a** — generator count and outcome. S3b adds artifact keys and warnings; S4 adds the numbers. Nothing reads it yet, which is why it stays small rather than being designed ahead of a consumer.
