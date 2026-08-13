@@ -107,9 +107,12 @@ consumer after an idle timeout.
 Delivery is **at-least-once**, which is a design constraint rather than a
 footnote — see the reconciler below.
 
-One stream in this slice: `runs.execution`, carrying `{runId}` and nothing else.
-The run row is the payload; a message that duplicates state would be a second
-source of truth.
+One stream in this slice: `runs.execution`, carrying `{runId, organizationId}`
+and nothing else. The run row is the payload; a message that duplicated state
+would be a second source of truth. The organisation is addressing rather than
+state: every query is organisation-scoped under RLS
+([invariant 4](../../../CLAUDE.md)), so a consumer cannot read the run at all
+until it knows which tenant to bind its session to.
 
 ## Starting a run
 
@@ -136,11 +139,25 @@ On a pass, one transaction:
    allowlist — [invariant 3](../../../CLAUDE.md).
 4. Record the audit row.
 
-After the transaction commits, publish `{runId}` to `runs.execution`. A publish
-lost to a crash between commit and publish is recovered by the worker sweeping
-for `QUEUED` runs older than a threshold. A transactional outbox is the textbook
-answer and needs a table; this slice adds no migration, and a sweep the worker
-needs anyway is the cheaper correct answer.
+After the transaction commits, publish to `runs.execution`. Publishing inside the
+transaction would hold it open across a network call, which S2's constraint
+forbids, and would let a consumer read the run before it exists.
+
+If the publish itself fails, the request marks the run `FAILED` with a reason
+and says so: the caller learns synchronously rather than watching a run sit at
+`QUEUED`.
+
+**A known gap, recorded rather than papered over.** A process that dies in the
+window between commit and publish leaves a `QUEUED` run that no consumer knows
+about. Recovering it automatically means finding stuck runs across every tenant,
+and [invariant 4](../../../CLAUDE.md) means no ordinary connection can read
+across tenants. The fix is the shape S1 already used for the login lookup — a
+`SECURITY DEFINER` function owned by a `NOLOGIN BYPASSRLS` role, returning only
+`(run_id, organization_id)` and nothing else, the way `auth_lookup_user` returns
+only the login columns. It is deferred because it is a schema change and this
+slice adds none, and because the window is a crash between two adjacent
+statements. The run stays visible at `QUEUED` throughout; it is stalled, not
+lost.
 
 Nothing about run creation executes load. The API enqueues; the worker
 orchestrates; generators execute — [invariant 1](../../../CLAUDE.md).
@@ -443,6 +460,12 @@ Recorded because they were not in the specification before now.
    is not achievable; idempotent actions guarded by persisted state are.
 9. **No `Idempotency-Key` on run creation.** It is v0.2, and a header that looks
    honoured but is not is worse than an absent one.
+10. **The execution message carries the organisation id**, and the recovery
+    sweep for a run stalled by a crash between commit and publish is deferred.
+    Both follow from RLS: a consumer cannot read a run without knowing its
+    tenant, and cannot find stuck runs across tenants without the scoped
+    `SECURITY DEFINER` lookup S1 used for login — which is a migration, and this
+    slice adds none.
 
 None of these contradicts an ADR. Item 1 contradicts an architecture document
 and is the one worth disagreeing with now; item 4 shapes the protocol S4 extends.
