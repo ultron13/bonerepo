@@ -1,5 +1,10 @@
 FROM python:3.12-slim AS base
 ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+# verify and version pinning shell out to git: ls-remote to resolve a ref, and
+# a blobless sparse fetch to read the plan.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
 # Pinned to the uv that writes uv.lock, so `--frozen` can read it.
 COPY --from=ghcr.io/astral-sh/uv:0.11.29 /uv /usr/local/bin/uv
 WORKDIR /srv

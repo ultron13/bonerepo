@@ -4,8 +4,10 @@ Plimsoll is an open-source **performance-testing control plane**. It orchestrate
 Apache JMeter across many containerised load generators, merges their results
 correctly, and gates CI/CD pipelines on SLA outcomes.
 
-> **Status: pre-alpha.** The specification is written; implementation has not
-> started. Read `docs/architecture/01-overview.md` before writing any code.
+> **Status: pre-alpha.** The API control plane defines and validates tests —
+> projects, credentials, pools, target policy, Git-sourced scripts, tests, and
+> preflight. Execution, metrics, and the web interface are still specification
+> only. Read `docs/architecture/01-overview.md` before writing any code.
 
 The full specification lives in `docs/`. This file is only the working guide —
 keep it short. Do not paste product specification into it.

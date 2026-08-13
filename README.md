@@ -94,8 +94,8 @@ virtual users, and a long test can never block it.
 
 ## Quickstart
 
-> Not yet functional — this is the target experience, and the contract `make dev`
-> is held to.
+> Partly functional. The control plane defines and validates tests today;
+> executing them, and the web interface at `:3000`, are still being built.
 
 ```bash
 git clone https://github.com/ultron13/bonerepo.git
@@ -107,7 +107,58 @@ One command, no Kubernetes required: six control-plane containers plus a small
 bundled demo target. `make dev` seeds a demo project with a JMeter plan — and a
 target-policy allowlist entry for the bundled target, since an empty allowlist
 permits no runs — so there is something to run, and something it is allowed to
-hit, immediately. Open <http://localhost:3000>.
+hit, immediately. It also starts a small Git server holding the demo plan, so
+nothing on this path depends on reaching the internet.
+
+### Take the demo from Git to a validated test
+
+Sign in as the seeded administrator:
+
+```bash
+TOKEN=$(curl -sX POST http://localhost:8000/api/v1/auth/login \
+  -H 'content-type: application/json' \
+  -d '{"email":"admin@demo.plimsoll.dev","password":"plimsoll-demo-password"}' \
+  | jq -r .accessToken)
+AUTH="authorization: Bearer $TOKEN"
+```
+
+Find the seeded script repository and verify it. `verify` resolves the ref,
+reads the plan and its `plimsoll.yaml`, and reports every finding at once:
+
+```bash
+PROJECT=$(curl -s -H "$AUTH" 'http://localhost:8000/api/v1/projects?limit=200' \
+  | jq -r '.items[] | select(.projectKey=="DEMO") | .id')
+REPO=$(curl -s -H "$AUTH" "http://localhost:8000/api/v1/projects/$PROJECT/script-repos" \
+  | jq -r '.items[0].id')
+
+curl -sX POST -H "$AUTH" "http://localhost:8000/api/v1/script-repos/$REPO/verify" | jq
+```
+
+Pin the branch to the commit it currently names. Repeating this returns the same
+version rather than a second one — a commit SHA is immutable, so pinning it
+twice describes the same thing:
+
+```bash
+curl -sX POST -H "$AUTH" -H 'content-type: application/json' \
+  -d '{"ref":"main"}' \
+  "http://localhost:8000/api/v1/script-repos/$REPO/versions" | jq '{commitSha, checksum}'
+```
+
+Ask whether the seeded test will actually run:
+
+```bash
+TEST=$(curl -s -H "$AUTH" "http://localhost:8000/api/v1/projects/$PROJECT/tests" \
+  | jq -r '.items[] | select(.name=="Demo checkout test") | .id')
+
+curl -sX POST -H "$AUTH" "http://localhost:8000/api/v1/tests/$TEST/validate" | jq
+```
+
+The answer is a list of checks, not a single yes or no, and every one of them
+runs: the plans add up to the workload, each ref resolves, each plan parses,
+every variable it references has a stored value, every target host it reaches is
+inside the allowlist, and the pool has the capacity. To watch it refuse, point
+the plan's `API_HOST` variable somewhere the allowlist does not permit and
+validate again — `TARGET_ALLOWED` fails and names the host.
 
 Locally, generators are Docker containers. In production the same image runs as
 Kubernetes pods. Only the launcher differs — see

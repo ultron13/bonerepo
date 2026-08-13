@@ -1,0 +1,19 @@
+version: 1
+engine: jmeter
+
+jmeter:
+  version: "5.6.3"
+
+plugins:
+  - id: jpgc-casutg
+    version: "2.10"
+    sha256: "9f2c4a00000000000000000000000000000000000000000000000000000000ff"
+
+plans:
+  - path: checkout.jmx
+    data:
+      - path: data/users.csv
+        distribution: shared
+    variables:
+      - API_HOST
+      - API_TOKEN
