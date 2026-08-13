@@ -347,10 +347,46 @@ export interface paths {
         patch: operations["update_test_api_v1_tests__test_id__patch"];
         trace?: never;
     };
+    "/api/v1/tests/{test_id}/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validate Test
+         * @description 200 whenever the test exists: the report is the answer.
+         *
+         *     TEST_WRITE rather than a read permission, because it makes the platform
+         *     reach a third-party Git host on the caller's behalf.
+         */
+        post: operations["validate_test_api_v1_tests__test_id__validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Check */
+        Check: {
+            /** Code */
+            code: string;
+            status: components["schemas"]["CheckStatus"];
+            /** Detail */
+            detail: string;
+        };
+        /**
+         * CheckStatus
+         * @enum {string}
+         */
+        CheckStatus: "PASS" | "FAIL" | "SKIPPED";
         /** CredentialCreate */
         CredentialCreate: {
             /** Name */
@@ -566,6 +602,13 @@ export interface components {
             maxGenerators?: number | null;
             /** Maxvuspergenerator */
             maxVusPerGenerator?: number | null;
+        };
+        /** PreflightReport */
+        PreflightReport: {
+            /** Ok */
+            ok: boolean;
+            /** Checks */
+            checks: components["schemas"]["Check"][];
         };
         /** ProjectCreate */
         ProjectCreate: {
@@ -1954,6 +1997,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_test_api_v1_tests__test_id__validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                test_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreflightReport"];
                 };
             };
             /** @description Validation Error */

@@ -90,6 +90,22 @@ async def by_name(session: AsyncSession, name: str) -> sa.Row[Any] | None:
     ).first()
 
 
+async def variable_material(session: AsyncSession) -> list[sa.Row[Any]]:
+    """Every VARIABLE credential, for the one caller that needs them all.
+
+    Preflight resolves a plan's target host from these, and cannot know which
+    names a plan references until it has read the plan -- by which time the
+    transaction is closed, because reading it means talking to Git.
+    """
+    result = await session.execute(
+        sa.text(
+            "SELECT name, ciphertext, key_ref FROM credentials "
+            "WHERE kind = 'VARIABLE' ORDER BY name"
+        )
+    )
+    return list(result.all())
+
+
 async def referencing_repos(session: AsyncSession, credential_id: uuid.UUID) -> list[str]:
     result = await session.execute(
         sa.text("SELECT name FROM script_repos WHERE credential_id = :id ORDER BY name"),

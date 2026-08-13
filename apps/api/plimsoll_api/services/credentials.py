@@ -65,6 +65,19 @@ async def secret_named(session: AsyncSession, name: str) -> bytes | None:
     return get_key_provider().decrypt(material.ciphertext, material.key_ref)
 
 
+async def variables(session: AsyncSession) -> dict[str, str]:
+    """Name to value for every VARIABLE credential in the organisation.
+
+    A third decryption path, and the same rule holds: the plaintext stays
+    server-side. Preflight reads a value only to resolve a target host.
+    """
+    provider = get_key_provider()
+    return {
+        row.name: provider.decrypt(row.ciphertext, row.key_ref).decode(errors="replace")
+        for row in await repo.variable_material(session)
+    }
+
+
 async def delete(session: AsyncSession, principal: AccessClaims, credential_id: uuid.UUID) -> None:
     if await repo.get(session, credential_id) is None:
         raise PlimsollError(ErrorCode.NOT_FOUND, "No such credential.")

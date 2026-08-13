@@ -38,8 +38,11 @@ DEMO_POOL_CONFIG = '{"image": "ghcr.io/ultron13/generator:jmeter-5.6.3"}'
 FIXTURE_TOKEN = "plimsoll:plimsoll-fixture-token"  # noqa: S105 - development seed only
 FIXTURE_REPO_URL = "http://script-fixture/private/plans.git"
 # The demo plan reaches ${API_HOST}; preflight resolves it from this variable
-# and checks the result against the allowlist.
+# and checks the result against the allowlist. It also sends ${API_TOKEN}, which
+# preflight checks the existence of and never reads: the demo cannot validate
+# clean without both being stored.
 DEMO_API_HOST = "demo-target"
+DEMO_API_TOKEN = "demo-api-token"  # noqa: S105 - development seed only
 # generatorPoolId is stamped from the seeded pool immediately after insert: the
 # identifier is not known until that row exists.
 DEMO_WORKLOAD = (
@@ -108,6 +111,7 @@ async def seed() -> None:
         for name, secret in (
             ("fixture-git-token", FIXTURE_TOKEN),
             ("API_HOST", DEMO_API_HOST),
+            ("API_TOKEN", DEMO_API_TOKEN),
         ):
             ciphertext, key_ref = get_key_provider().encrypt(secret.encode())
             await connection.execute(
