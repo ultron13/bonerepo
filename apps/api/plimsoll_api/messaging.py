@@ -125,7 +125,8 @@ class RedisStreamBus:
             yield messages()
         finally:
             await pubsub.unsubscribe(channel)
-            await pubsub.aclose()  # type: ignore[no-untyped-call]  # PubSub.aclose has no stub signature
+            # PubSub.aclose has no stub signature in redis-py.
+            await pubsub.aclose()  # type: ignore[no-untyped-call]
 
 
 _bus: RedisStreamBus | None = None
