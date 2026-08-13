@@ -310,6 +310,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/tests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Tests */
+        get: operations["list_tests_api_v1_projects__project_id__tests_get"];
+        put?: never;
+        /** Create Test */
+        post: operations["create_test_api_v1_projects__project_id__tests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tests/{test_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Test */
+        get: operations["get_test_api_v1_tests__test_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Test */
+        delete: operations["delete_test_api_v1_tests__test_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Test */
+        patch: operations["update_test_api_v1_tests__test_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -418,6 +455,13 @@ export interface components {
         Page_ScriptVersionResponse_: {
             /** Items */
             items: components["schemas"]["ScriptVersionResponse"][];
+            /** Nextcursor */
+            nextCursor?: string | null;
+        };
+        /** Page[TestResponse] */
+        Page_TestResponse_: {
+            /** Items */
+            items: components["schemas"]["TestResponse"][];
             /** Nextcursor */
             nextCursor?: string | null;
         };
@@ -671,6 +715,41 @@ export interface components {
              */
             resolvedAt: string;
         };
+        /**
+         * SlaMetric
+         * @enum {string}
+         */
+        SlaMetric: "p50" | "p90" | "p95" | "p99" | "avg" | "error_rate" | "throughput";
+        /**
+         * SlaOperator
+         * @enum {string}
+         */
+        SlaOperator: "lt" | "lte" | "gt" | "gte";
+        /** SlaRuleSpec */
+        SlaRuleSpec: {
+            /** Name */
+            name: string;
+            metric: components["schemas"]["SlaMetric"];
+            /** Entity */
+            entity?: string | null;
+            operator: components["schemas"]["SlaOperator"];
+            /** Threshold */
+            threshold: number;
+            /** Unit */
+            unit?: string | null;
+            /** @default ERROR */
+            severity: components["schemas"]["SlaSeverity"];
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+        };
+        /**
+         * SlaSeverity
+         * @enum {string}
+         */
+        SlaSeverity: "ERROR" | "WARNING";
         /** TargetPolicyResponse */
         TargetPolicyResponse: {
             /** Version */
@@ -684,6 +763,94 @@ export interface components {
         TargetPolicyUpdate: {
             /** Allowlist */
             allowlist: string[];
+        };
+        /** TestCreate */
+        TestCreate: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            configuration: components["schemas"]["WorkloadSpec"];
+            /** Plans */
+            plans: components["schemas"]["TestPlanSpec"][];
+            /** Slarules */
+            slaRules?: components["schemas"]["SlaRuleSpec"][];
+            /** Tags */
+            tags?: string[];
+        };
+        /** TestPlanSpec */
+        TestPlanSpec: {
+            /**
+             * Scriptrepoid
+             * Format: uuid
+             */
+            scriptRepoId: string;
+            /** Pinnedref */
+            pinnedRef?: string | null;
+            /**
+             * Virtualusers
+             * @default 1
+             */
+            virtualUsers: number;
+            /**
+             * Executionorder
+             * @default 1
+             */
+            executionOrder: number;
+        };
+        /** TestResponse */
+        TestResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Projectid
+             * Format: uuid
+             */
+            projectId: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /** Status */
+            status: string;
+            configuration: components["schemas"]["WorkloadSpec"];
+            /** Plans */
+            plans: components["schemas"]["TestPlanSpec"][];
+            /** Slarules */
+            slaRules: components["schemas"]["SlaRuleSpec"][];
+            /** Tags */
+            tags: string[];
+            /** Version */
+            version: number;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /**
+             * Updatedat
+             * Format: date-time
+             */
+            updatedAt: string;
+        };
+        /** TestUpdate */
+        TestUpdate: {
+            /** Version */
+            version: number;
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            configuration?: components["schemas"]["WorkloadSpec"] | null;
+            /** Plans */
+            plans?: components["schemas"]["TestPlanSpec"][] | null;
+            /** Slarules */
+            slaRules?: components["schemas"]["SlaRuleSpec"][] | null;
+            /** Tags */
+            tags?: string[] | null;
         };
         /** TokenResponse */
         TokenResponse: {
@@ -723,6 +890,23 @@ export interface components {
             plan?: components["schemas"]["PlanSummaryResponse"] | null;
             /** Plugins */
             plugins?: components["schemas"]["PluginSummary"][];
+        };
+        /** WorkloadSpec */
+        WorkloadSpec: {
+            /** Virtualusers */
+            virtualUsers: number;
+            /** Durationseconds */
+            durationSeconds: number;
+            /**
+             * Rampupseconds
+             * @default 0
+             */
+            rampUpSeconds: number;
+            /**
+             * Generatorpoolid
+             * Format: uuid
+             */
+            generatorPoolId: string;
         };
     };
     responses: never;
@@ -1606,6 +1790,170 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScriptVersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tests_api_v1_projects__project_id__tests_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TestResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_test_api_v1_projects__project_id__tests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_test_api_v1_tests__test_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                test_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_test_api_v1_tests__test_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                test_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_test_api_v1_tests__test_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                test_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestResponse"];
                 };
             };
             /** @description Validation Error */

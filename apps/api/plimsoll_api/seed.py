@@ -40,6 +40,15 @@ FIXTURE_REPO_URL = "http://script-fixture/private/plans.git"
 # The demo plan reaches ${API_HOST}; preflight resolves it from this variable
 # and checks the result against the allowlist.
 DEMO_API_HOST = "demo-target"
+# generatorPoolId is stamped from the seeded pool immediately after insert: the
+# identifier is not known until that row exists.
+DEMO_WORKLOAD = (
+    '{"virtualUsers": 20, "durationSeconds": 300, "rampUpSeconds": 60, '
+    '"generatorPoolId": "00000000-0000-0000-0000-000000000000"}'
+)
+# Derived rather than random, so re-running the seed is a no-op and so the demo
+# test can be addressed directly instead of searched for.
+DEMO_TEST_ID = uuid.uuid5(DEMO_ORG_ID, "demo-checkout-test")
 
 
 async def seed() -> None:
@@ -131,6 +140,55 @@ async def seed() -> None:
                 "      (SELECT 1 FROM script_repos WHERE name = 'Demo checkout plan')"
             ),
             {"id": uuid.uuid4(), "org": DEMO_ORG_ID, "url": FIXTURE_REPO_URL},
+        )
+
+        demo_test_id = DEMO_TEST_ID
+        await connection.execute(
+            sa.text(
+                "INSERT INTO performance_tests "
+                "(id, organization_id, project_id, name, configuration) "
+                "SELECT :id, :org, p.id, 'Demo checkout test', CAST(:configuration AS jsonb) "
+                "FROM projects p, generator_pools g "
+                "WHERE p.project_key = 'DEMO' AND g.name = 'local-docker' "
+                "ON CONFLICT (id) DO NOTHING"
+            ),
+            {
+                "id": demo_test_id,
+                "org": DEMO_ORG_ID,
+                "configuration": DEMO_WORKLOAD,
+            },
+        )
+        await connection.execute(
+            sa.text(
+                "UPDATE performance_tests SET configuration = jsonb_set("
+                "  configuration, '{generatorPoolId}', to_jsonb(g.id::text)) "
+                "FROM generator_pools g "
+                "WHERE performance_tests.id = :id AND g.name = 'local-docker'"
+            ),
+            {"id": demo_test_id},
+        )
+        await connection.execute(
+            sa.text(
+                "INSERT INTO performance_test_plans "
+                "(id, organization_id, performance_test_id, script_repo_id, pinned_ref, "
+                " virtual_users, execution_order) "
+                "SELECT :id, :org, :test, r.id, 'main', 20, 1 "
+                "FROM script_repos r "
+                "WHERE r.name = 'Demo checkout plan' "
+                "  AND NOT EXISTS (SELECT 1 FROM performance_test_plans "
+                "                  WHERE performance_test_id = :test)"
+            ),
+            {"id": uuid.uuid4(), "org": DEMO_ORG_ID, "test": demo_test_id},
+        )
+        await connection.execute(
+            sa.text(
+                "INSERT INTO sla_rules "
+                "(id, organization_id, performance_test_id, name, metric, operator, threshold, "
+                " unit, severity) "
+                "SELECT :id, :org, :test, 'p95 under 800ms', 'p95', 'lt', 800, 'ms', 'ERROR' "
+                "WHERE NOT EXISTS (SELECT 1 FROM sla_rules WHERE performance_test_id = :test)"
+            ),
+            {"id": uuid.uuid4(), "org": DEMO_ORG_ID, "test": demo_test_id},
         )
 
         await connection.execute(

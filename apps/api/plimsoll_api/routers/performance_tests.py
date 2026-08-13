@@ -1,0 +1,105 @@
+from __future__ import annotations
+
+import uuid
+
+from fastapi import APIRouter, Depends, Query, Response
+
+from plimsoll_api.dependencies import CurrentPrincipal, TenantSession
+from plimsoll_api.pagination import page_of, position_from
+from plimsoll_api.repositories import performance_tests as repo
+from plimsoll_api.security.permissions import Permission, requires
+from plimsoll_api.services import performance_tests as service
+from plimsoll_contracts.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, Page
+from plimsoll_contracts.performance_tests import (
+    TestCreate,
+    TestResponse,
+    TestUpdate,
+    WorkloadSpec,
+)
+
+router = APIRouter(tags=["tests"])
+
+
+def _response(document: service.TestDocument) -> TestResponse:
+    row = document.row
+    return TestResponse(
+        id=row.id,
+        project_id=row.project_id,
+        name=row.name,
+        description=row.description,
+        status=row.status,
+        configuration=WorkloadSpec.model_validate(row.configuration),
+        plans=document.plans,
+        sla_rules=document.sla_rules,
+        tags=list(row.tags),
+        version=row.version,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+@router.post(
+    "/api/v1/projects/{project_id}/tests",
+    response_model=TestResponse,
+    status_code=201,
+    dependencies=[Depends(requires(Permission.TEST_WRITE))],
+)
+async def create_test(
+    project_id: uuid.UUID,
+    body: TestCreate,
+    principal: CurrentPrincipal,
+    session: TenantSession,
+) -> TestResponse:
+    return _response(await service.create(session, principal, project_id, body))
+
+
+@router.get(
+    "/api/v1/projects/{project_id}/tests",
+    response_model=Page[TestResponse],
+    dependencies=[Depends(requires(Permission.TEST_READ))],
+)
+async def list_tests(
+    project_id: uuid.UUID,
+    session: TenantSession,
+    limit: int = Query(default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT),
+    cursor: str | None = None,
+) -> Page[TestResponse]:
+    rows = await repo.list_page_for_project(
+        session, project_id, limit=limit + 1, after=position_from(cursor)
+    )
+    # Two extra queries per test on the page. At the 50/200 page limits that is
+    # cheap, and it keeps a listed test identical to a fetched one.
+    documents = {row.id: await service.require(session, row.id) for row in rows[:limit]}
+    return page_of(rows, limit, lambda row: _response(documents[row.id]))
+
+
+@router.get(
+    "/api/v1/tests/{test_id}",
+    response_model=TestResponse,
+    dependencies=[Depends(requires(Permission.TEST_READ))],
+)
+async def get_test(test_id: uuid.UUID, session: TenantSession) -> TestResponse:
+    return _response(await service.require(session, test_id))
+
+
+@router.patch(
+    "/api/v1/tests/{test_id}",
+    response_model=TestResponse,
+    dependencies=[Depends(requires(Permission.TEST_WRITE))],
+)
+async def update_test(
+    test_id: uuid.UUID, body: TestUpdate, principal: CurrentPrincipal, session: TenantSession
+) -> TestResponse:
+    return _response(await service.update(session, principal, test_id, body))
+
+
+@router.delete(
+    "/api/v1/tests/{test_id}",
+    status_code=204,
+    dependencies=[Depends(requires(Permission.TEST_WRITE))],
+)
+async def delete_test(
+    test_id: uuid.UUID, principal: CurrentPrincipal, session: TenantSession
+) -> Response:
+    await service.archive(session, principal, test_id)
+    return Response(status_code=204)
