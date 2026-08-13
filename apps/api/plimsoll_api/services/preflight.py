@@ -132,7 +132,11 @@ def _targets_check(summaries: list[PlanSummary], inputs: PreflightInput, *, bloc
         if unresolved:
             reasons.append("unresolved: " + ", ".join(unresolved))
         return _failed("TARGET_ALLOWED", "; ".join(reasons))
-    return _passed("TARGET_ALLOWED", "Permitted by the target policy: " + ", ".join(allowed))
+    # Deduplicated: a literal host and a variable that resolves to it are one
+    # target, and reporting it twice reads as a mistake.
+    return _passed(
+        "TARGET_ALLOWED", "Permitted by the target policy: " + ", ".join(sorted(set(allowed)))
+    )
 
 
 def _capacity_check(inputs: PreflightInput) -> Check:

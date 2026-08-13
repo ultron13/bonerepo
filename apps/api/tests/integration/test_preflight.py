@@ -102,6 +102,60 @@ def test_a_variable_with_no_stored_value_fails_that_check(admin_client: httpx.Cl
         _set_variable(admin_client, "API_TOKEN", "demo-api-token")
 
 
+def test_a_plan_pinned_to_a_commit_passes(admin_client: httpx.Client) -> None:
+    """Pinning a commit is what a run does; preflight must accept one."""
+    project_id = str(
+        admin_client.post(
+            "/api/v1/projects",
+            json={"name": "Pinned", "projectKey": f"P{uuid.uuid4().hex[:8].upper()}"},
+        ).json()["id"]
+    )
+    repo_id = str(
+        admin_client.post(
+            f"/api/v1/projects/{project_id}/script-repos",
+            json={
+                "name": f"repo-{uuid.uuid4().hex[:6]}",
+                "repoUrl": "http://script-fixture/public/plans.git",
+                "planPath": "perf/checkout.jmx",
+                "defaultRef": "main",
+            },
+        ).json()["id"]
+    )
+    commit_sha = admin_client.post(
+        f"/api/v1/script-repos/{repo_id}/versions", json={"ref": "main"}
+    ).json()["commitSha"]
+    pool_id = next(
+        str(item["id"])
+        for item in admin_client.get("/api/v1/generator-pools?limit=200").json()["items"]
+        if item["name"] == "local-docker"
+    )
+    created = admin_client.post(
+        f"/api/v1/projects/{project_id}/tests",
+        json={
+            "name": "Pinned to a commit",
+            "configuration": {
+                "virtualUsers": 10,
+                "durationSeconds": 60,
+                "rampUpSeconds": 10,
+                "generatorPoolId": pool_id,
+            },
+            "plans": [
+                {
+                    "scriptRepoId": repo_id,
+                    "pinnedRef": commit_sha,
+                    "virtualUsers": 10,
+                    "executionOrder": 1,
+                }
+            ],
+            "slaRules": [],
+        },
+    ).json()
+
+    body = _validate(admin_client, created["id"])
+    assert body["ok"] is True, body["checks"]
+    assert commit_sha[:8] in _detail(body, "SCRIPT_REF")
+
+
 def test_every_failing_check_is_reported_at_once(admin_client: httpx.Client) -> None:
     project_id = str(
         admin_client.post(

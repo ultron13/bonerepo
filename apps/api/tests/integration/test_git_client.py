@@ -60,6 +60,13 @@ async def test_a_ref_resolves_to_a_commit() -> None:
     assert set(resolution.sha) <= set("0123456789abcdef")
 
 
+async def test_a_commit_sha_resolves_to_itself() -> None:
+    """A pinned commit is already resolved; ls-remote would not know it."""
+    access = GitAccess(PUBLIC)
+    tip = (await resolve_ref(access, "main")).sha
+    assert (await resolve_ref(access, tip)).sha == tip
+
+
 async def test_an_unknown_ref_is_an_error() -> None:
     with pytest.raises(GitError):
         await resolve_ref(GitAccess(PUBLIC), "no-such-branch")

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import shutil
 import tempfile
 from collections.abc import AsyncIterator
@@ -19,6 +20,7 @@ from datetime import datetime
 from pathlib import Path
 
 TIMEOUT_SECONDS = 60
+COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 # The username a token-only credential is presented under; the convention most
 # Git hosts accept. Not a secret.
 DEFAULT_TOKEN_USERNAME = "x-access-token"  # noqa: S105
@@ -110,6 +112,17 @@ async def _run(command: list[str], *, environment: dict[str, str], cwd: Path | N
 
 
 async def resolve_ref(access: GitAccess, ref: str) -> RefResolution:
+    """A commit SHA resolves to itself.
+
+    `ls-remote` advertises refs, not objects, so asking it about a commit would
+    fail on the one input that is already immutable -- and pinning a commit is
+    the whole point of pinning. Whether that commit exists in the repository is
+    settled by the fetch that follows, which is where a wrong SHA is caught.
+    """
+    candidate = ref.strip()
+    if COMMIT_SHA.match(candidate):
+        return RefResolution(sha=candidate)
+
     async with _workspace(access) as (environment, _):
         output = await _run(
             ["git", "ls-remote", "--exit-code", access.url, ref], environment=environment
