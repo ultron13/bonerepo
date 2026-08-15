@@ -12,11 +12,17 @@ closes it, and hands them here.
 from __future__ import annotations
 
 import re
+import uuid
 from dataclasses import dataclass, field
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from plimsoll_api.errors import PlimsollError
 from plimsoll_api.git.client import GitAccess, GitError, fetch_plan, resolve_ref
 from plimsoll_api.plans.jmx import PlanParseError, PlanSummary, parse_plan
+from plimsoll_api.services import credentials, performance_tests, pools, script_repos, target_policy
 from plimsoll_api.services.target_policy import matches_allowlist
+from plimsoll_contracts.performance_tests import WorkloadSpec
 from plimsoll_contracts.validation import Check, CheckStatus, PreflightReport
 
 # A host written entirely as one variable reference, which is the only form the
@@ -26,6 +32,7 @@ WHOLE_VARIABLE = re.compile(r"^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$")
 
 @dataclass(frozen=True)
 class PlanInput:
+    script_repo_id: uuid.UUID
     repo_name: str
     access: GitAccess
     plan_path: str
@@ -44,6 +51,48 @@ class PreflightInput:
     # None means the pool is gone or no longer active, which is a capacity
     # failure rather than a reason to refuse the whole report.
     free_capacity: int | None = None
+
+
+async def gather(session: AsyncSession, test_id: uuid.UUID) -> PreflightInput:
+    """Everything the checks need, read in one transaction and nothing more.
+
+    The Git work runs after this returns, outside the transaction: a clone held
+    open against a stranger's host would hold a connection with it.
+    """
+    document = await performance_tests.require(session, test_id)
+    configuration = WorkloadSpec.model_validate(document.row.configuration)
+
+    plans = []
+    for plan in document.plans:
+        row = await script_repos.require(session, plan.script_repo_id)
+        plans.append(
+            PlanInput(
+                script_repo_id=plan.script_repo_id,
+                repo_name=row.name,
+                access=await script_repos.access_for(session, row),
+                plan_path=row.plan_path,
+                ref=plan.pinned_ref or row.default_ref,
+                virtual_users=plan.virtual_users,
+            )
+        )
+
+    policy = await target_policy.current_policy(session)
+    try:
+        free_capacity: int | None = await pools.capacity_for(
+            session, configuration.generator_pool_id
+        )
+    except PlimsollError:
+        # An archived or deleted pool is a capacity failure to report, not a
+        # reason to refuse the caller an answer about everything else.
+        free_capacity = None
+
+    return PreflightInput(
+        requested_users=configuration.virtual_users,
+        plans=plans,
+        allowlist=list(policy.allowlist) if policy is not None else [],
+        variables=await credentials.variables(session),
+        free_capacity=free_capacity,
+    )
 
 
 def _passed(code: str, detail: str) -> Check:
@@ -151,19 +200,36 @@ def _capacity_check(inputs: PreflightInput) -> Check:
     )
 
 
-async def run(inputs: PreflightInput) -> PreflightReport:
+@dataclass(frozen=True)
+class Assessment:
+    """The report, and the commits behind it.
+
+    A run's snapshot is built from `resolved`, so the commit that was checked
+    and the commit that will execute are the same object rather than two
+    lookups that agree today.
+    """
+
+    report: PreflightReport
+    # Index into PreflightInput.plans -> resolved commit SHA. Indexed rather
+    # than named: two repositories in one organisation may share a name.
+    resolved: dict[int, str]
+
+
+async def assess(inputs: PreflightInput) -> Assessment:
     checks: list[Check] = [_structure_check(inputs)]
 
     # Every ref resolves. Failures accumulate; the loop does not stop.
     resolved: dict[str, str] = {}
+    resolved_by_index: dict[int, str] = {}
     unresolved: list[str] = []
-    for plan in inputs.plans:
+    for index, plan in enumerate(inputs.plans):
         try:
             resolution = await resolve_ref(plan.access, plan.ref)
         except GitError as exc:
             unresolved.append(f"{plan.repo_name} at {plan.ref}: {exc}")
         else:
             resolved[plan.repo_name] = resolution.sha
+            resolved_by_index[index] = resolution.sha
     checks.append(
         _failed("SCRIPT_REF", "; ".join(unresolved))
         if unresolved
@@ -199,6 +265,12 @@ async def run(inputs: PreflightInput) -> PreflightReport:
     checks.append(_targets_check(summaries, inputs, blocked=blocked))
     checks.append(_capacity_check(inputs))
 
-    return PreflightReport(
+    report = PreflightReport(
         ok=all(check.status is CheckStatus.PASS for check in checks), checks=checks
     )
+    return Assessment(report=report, resolved=resolved_by_index)
+
+
+async def run(inputs: PreflightInput) -> PreflightReport:
+    """The report alone, for callers that only need the answer."""
+    return (await assess(inputs)).report

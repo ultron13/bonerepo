@@ -262,3 +262,29 @@ def test_an_unknown_test_is_not_found(admin_client: httpx.Client) -> None:
 
 def test_a_viewer_cannot_validate(viewer_client: httpx.Client) -> None:
     assert viewer_client.post(f"/api/v1/tests/{DEMO_TEST_ID}/validate").status_code == 403
+
+
+async def test_assess_returns_the_commit_it_resolved(admin_org: uuid.UUID) -> None:
+    """The snapshot is built from these, so they must be the real SHAs and not
+    the truncated ones the report prints."""
+    from plimsoll_api.db.session import session_for_org
+    from plimsoll_api.services import preflight
+
+    async with session_for_org(admin_org) as session:
+        inputs = await preflight.gather(session, DEMO_TEST_ID)
+
+    assessment = await preflight.assess(inputs)
+    assert assessment.report.ok is True
+    assert list(assessment.resolved) == [0]
+    assert len(assessment.resolved[0]) == 40
+
+
+async def test_gather_names_the_repository_behind_each_plan(admin_org: uuid.UUID) -> None:
+    from plimsoll_api.db.session import session_for_org
+    from plimsoll_api.services import preflight
+
+    async with session_for_org(admin_org) as session:
+        inputs = await preflight.gather(session, DEMO_TEST_ID)
+
+    assert inputs.plans[0].script_repo_id is not None
+    assert inputs.plans[0].plan_path == "perf/checkout.jmx"

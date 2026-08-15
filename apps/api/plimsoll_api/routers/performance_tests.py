@@ -6,18 +6,10 @@ from fastapi import APIRouter, Depends, Query, Response
 
 from plimsoll_api.db.session import session_for_org
 from plimsoll_api.dependencies import CurrentPrincipal, TenantSession
-from plimsoll_api.errors import PlimsollError
 from plimsoll_api.pagination import page_of, position_from
 from plimsoll_api.repositories import performance_tests as repo
 from plimsoll_api.security.permissions import Permission, requires
-from plimsoll_api.services import (
-    audit,
-    credentials,
-    pools,
-    preflight,
-    script_repos,
-    target_policy,
-)
+from plimsoll_api.services import audit, preflight
 from plimsoll_api.services import performance_tests as service
 from plimsoll_contracts.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, Page
 from plimsoll_contracts.performance_tests import (
@@ -116,47 +108,6 @@ async def delete_test(
     return Response(status_code=204)
 
 
-async def _preflight_input(session: TenantSession, test_id: uuid.UUID) -> preflight.PreflightInput:
-    """Everything the checks need, read in one transaction and nothing more.
-
-    The Git work runs after this returns, outside the transaction: a clone held
-    open against a stranger's host would hold a connection with it.
-    """
-    document = await service.require(session, test_id)
-    configuration = WorkloadSpec.model_validate(document.row.configuration)
-
-    plans = []
-    for plan in document.plans:
-        row = await script_repos.require(session, plan.script_repo_id)
-        plans.append(
-            preflight.PlanInput(
-                repo_name=row.name,
-                access=await script_repos.access_for(session, row),
-                plan_path=row.plan_path,
-                ref=plan.pinned_ref or row.default_ref,
-                virtual_users=plan.virtual_users,
-            )
-        )
-
-    policy = await target_policy.current_policy(session)
-    try:
-        free_capacity: int | None = await pools.capacity_for(
-            session, configuration.generator_pool_id
-        )
-    except PlimsollError:
-        # An archived or deleted pool is a capacity failure to report, not a
-        # reason to refuse the caller an answer about everything else.
-        free_capacity = None
-
-    return preflight.PreflightInput(
-        requested_users=configuration.virtual_users,
-        plans=plans,
-        allowlist=list(policy.allowlist) if policy is not None else [],
-        variables=await credentials.variables(session),
-        free_capacity=free_capacity,
-    )
-
-
 @router.post(
     "/api/v1/tests/{test_id}/validate",
     response_model=PreflightReport,
@@ -169,7 +120,7 @@ async def validate_test(test_id: uuid.UUID, principal: CurrentPrincipal) -> Pref
     reach a third-party Git host on the caller's behalf.
     """
     async with session_for_org(principal.organization_id) as session:
-        inputs = await _preflight_input(session, test_id)
+        inputs = await preflight.gather(session, test_id)
 
     report = await preflight.run(inputs)
 

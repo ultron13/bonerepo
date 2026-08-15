@@ -20,15 +20,24 @@ os.environ["PLIMSOLL_MIGRATION_DATABASE_URL"] = os.environ.get(
     "PLIMSOLL_TEST_MIGRATION_ASYNC_URL",
     "postgresql+asyncpg://plimsoll_owner:plimsoll_owner_dev@localhost:5432/plimsoll",
 )
+# Matches the compose stack's key: a test calling a service in-process (rather
+# than through the running API) decrypts with this key, and a mismatch here
+# reads as ciphertext corruption rather than a config problem.
+os.environ["PLIMSOLL_CREDENTIAL_KEY"] = os.environ.get(
+    "PLIMSOLL_TEST_CREDENTIAL_KEY",
+    "ZGV2ZWxvcG1lbnQtb25seS1rZXktMzItYnl0ZXMhISE=",
+)
 
 from plimsoll_api.config import get_settings
 from plimsoll_api.db import session as db_session
+from plimsoll_api.security import secrets
 
 # The settings and engine are cached. Drop anything built from the placeholder
 # values so a mixed unit-and-integration run still reaches the real database.
 get_settings.cache_clear()
 db_session.get_engine.cache_clear()
 db_session._session_factory.cache_clear()
+secrets.get_key_provider.cache_clear()
 
 
 @pytest.fixture(autouse=True)
