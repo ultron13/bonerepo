@@ -264,19 +264,75 @@ def test_a_viewer_cannot_validate(viewer_client: httpx.Client) -> None:
     assert viewer_client.post(f"/api/v1/tests/{DEMO_TEST_ID}/validate").status_code == 403
 
 
-async def test_assess_returns_the_commit_it_resolved(admin_org: uuid.UUID) -> None:
+def _test_against_the_published_fixture(client: httpx.Client) -> str:
+    """A test whose one plan reaches the fixture by its published port.
+
+    Kept synchronous, and called from the async test rather than inlined in
+    it: httpx.Client is a blocking client, and flake8-async (ASYNC212) flags a
+    blocking call written directly inside an async function.
+    """
+    project_id = str(
+        client.post(
+            "/api/v1/projects",
+            json={"name": "Assess", "projectKey": f"A{uuid.uuid4().hex[:8].upper()}"},
+        ).json()["id"]
+    )
+    repo_id = str(
+        client.post(
+            f"/api/v1/projects/{project_id}/script-repos",
+            json={
+                "name": f"repo-{uuid.uuid4().hex[:6]}",
+                "repoUrl": "http://localhost:8081/public/plans.git",
+                "planPath": "perf/checkout.jmx",
+                "defaultRef": "main",
+            },
+        ).json()["id"]
+    )
+    pool_id = next(
+        str(item["id"])
+        for item in client.get("/api/v1/generator-pools?limit=200").json()["items"]
+        if item["name"] == "local-docker"
+    )
+    created: dict[str, Any] = client.post(
+        f"/api/v1/projects/{project_id}/tests",
+        json={
+            "name": "Assess",
+            "configuration": {
+                "virtualUsers": 20,
+                "durationSeconds": 60,
+                "rampUpSeconds": 10,
+                "generatorPoolId": pool_id,
+            },
+            "plans": [{"scriptRepoId": repo_id, "virtualUsers": 20, "executionOrder": 1}],
+            "slaRules": [],
+        },
+    ).json()
+    return str(created["id"])
+
+
+async def test_assess_returns_the_commit_it_resolved(
+    admin_client: httpx.Client, admin_org: uuid.UUID
+) -> None:
     """The snapshot is built from these, so they must be the real SHAs and not
-    the truncated ones the report prints."""
+    the truncated ones the report prints.
+
+    The repository is addressed by the fixture's published port: this resolves
+    the ref in-process, and the compose-internal hostname resolves only inside
+    the compose network.
+    """
     from plimsoll_api.db.session import session_for_org
     from plimsoll_api.services import preflight
 
+    test_id = _test_against_the_published_fixture(admin_client)
+
     async with session_for_org(admin_org) as session:
-        inputs = await preflight.gather(session, DEMO_TEST_ID)
+        inputs = await preflight.gather(session, uuid.UUID(test_id))
 
     assessment = await preflight.assess(inputs)
-    assert assessment.report.ok is True
+    assert assessment.report.ok is True, assessment.report.checks
     assert list(assessment.resolved) == [0]
     assert len(assessment.resolved[0]) == 40
+    assert set(assessment.resolved[0]) <= set("0123456789abcdef")
 
 
 async def test_gather_names_the_repository_behind_each_plan(admin_org: uuid.UUID) -> None:
