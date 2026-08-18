@@ -68,6 +68,15 @@ services:
       interval: 3s
       retries: 20
 
+  generator-image:
+    image: ghcr.io/ultron13/generator:dev
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/generator.Dockerfile
+    # Never started: generators are created per run by the worker. This entry
+    # exists so `make dev` builds the image on a clean machine.
+    profiles: ["images"]
+
   demo-target:
     build:
       context: ../..

@@ -33,7 +33,7 @@ DEMO_USERS = [
 DEMO_ALLOWLIST = '["demo-target"]'
 # Two generators of 500 users each: enough for the demo test to pass preflight,
 # small enough to run on a laptop. S3 gives the runtime meaning.
-DEMO_POOL_CONFIG = '{"image": "ghcr.io/ultron13/generator:jmeter-5.6.3"}'
+DEMO_POOL_CONFIG = '{"image": "ghcr.io/ultron13/generator:dev"}'
 # The fixture's Basic-auth password. A development fixture, not a secret.
 FIXTURE_TOKEN = "plimsoll:plimsoll-fixture-token"  # noqa: S105 - development seed only
 FIXTURE_REPO_URL = "http://script-fixture/private/plans.git"

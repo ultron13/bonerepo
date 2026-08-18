@@ -1,0 +1,6 @@
+The agent's tests are deliberately not a Python package, for the same reason the
+worker's are not: `apps/api/tests` already owns the top-level `tests` package,
+and a second one collides in both pytest and mypy. See
+`apps/worker/tests/unit/.gitkeep`.
+
+This file only keeps the directory in Git so `make test` has a path to collect.

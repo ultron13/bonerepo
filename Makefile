@@ -4,7 +4,7 @@ UV := uv run
 COMPOSE := docker compose -f infrastructure/docker/docker-compose.yml
 
 test:
-	$(UV) pytest apps/api/tests/unit apps/worker/tests/unit -v
+	$(UV) pytest apps/api/tests/unit apps/worker/tests/unit apps/agent/tests/unit -v
 
 lint:
 	$(UV) ruff check .
@@ -17,6 +17,7 @@ format:
 	$(UV) ruff format .
 
 dev:
+	$(COMPOSE) build generator-image
 	$(COMPOSE) up --build -d
 	$(COMPOSE) exec -T api uv run alembic -c apps/api/alembic.ini upgrade head
 	$(COMPOSE) exec -T api uv run python -m plimsoll_api.seed

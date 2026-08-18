@@ -12,6 +12,10 @@ WORKDIR /srv
 COPY pyproject.toml uv.lock ./
 COPY apps/api/pyproject.toml apps/api/
 COPY apps/worker/pyproject.toml apps/worker/
+# Manifest only. uv resolves every workspace member before installing any of
+# them, dev group included, but --no-dev leaves the agent uninstalled -- so the
+# control plane never carries the code that runs beside a customer's plan.
+COPY apps/agent/pyproject.toml apps/agent/
 COPY packages/contracts/python/pyproject.toml packages/contracts/python/
 # Third-party dependencies only. The workspace packages must be skipped here:
 # their source is not copied yet, so an editable build would record a wheel

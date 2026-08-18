@@ -10,6 +10,7 @@ resolution-markers = [
 [manifest]
 members = [
     "plimsoll",
+    "plimsoll-agent",
     "plimsoll-api",
     "plimsoll-contracts",
     "plimsoll-worker",
@@ -984,6 +985,7 @@ dependencies = [
 dev = [
     { name = "httpx" },
     { name = "mypy" },
+    { name = "plimsoll-agent" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1004,12 +1006,30 @@ requires-dist = [
 dev = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "mypy", specifier = ">=1.10" },
+    { name = "plimsoll-agent", editable = "apps/agent" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.1" },
     { name = "pytest", specifier = ">=8.2" },
     { name = "pytest-asyncio", specifier = ">=0.23" },
     { name = "ruff", specifier = ">=0.5" },
     { name = "types-defusedxml", specifier = ">=0.7" },
     { name = "types-pyyaml", specifier = ">=6.0" },
+    { name = "websockets", specifier = ">=14" },
+]
+
+[[package]]
+name = "plimsoll-agent"
+version = "0.1.0"
+source = { editable = "apps/agent" }
+dependencies = [
+    { name = "httpx" },
+    { name = "plimsoll-contracts" },
+    { name = "websockets" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "plimsoll-contracts", editable = "packages/contracts/python" },
     { name = "websockets", specifier = ">=14" },
 ]
 
