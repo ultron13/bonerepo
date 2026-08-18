@@ -1435,7 +1435,7 @@ git commit -s -m "feat(worker): allocate virtual users so the totals reconcile"
 **Interfaces:**
 - Produces: `issue_agent_token(run_id, ordinal, org_id, ttl_seconds) -> str`, `decode_agent_token(token) -> AgentClaims`, the protocol models, and `WS /api/v1/agent/runs/{run_id}`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `apps/api/tests/integration/test_agent_channel.py`:
 
@@ -1532,12 +1532,12 @@ async def test_a_state_report_lands_on_the_generator_row(admin_client, admin_org
 
 Add `from plimsoll_api.seed import DEMO_TEST_ID` at the top, and add `"websockets>=13"` to the root `[dependency-groups] dev` list.
 
-- [ ] **Step 2: Run it to make sure it fails**
+- [x] **Step 2: Run it to make sure it fails**
 
 Run: `uv run pytest apps/api/tests/integration/test_agent_channel.py -v -m integration`
 Expected: FAIL — the WebSocket route does not exist, so the handshake is rejected.
 
-- [ ] **Step 3: Write the token**
+- [x] **Step 3: Write the token**
 
 Append to `apps/api/plimsoll_api/security/tokens.py`:
 
@@ -1601,7 +1601,7 @@ def decode_agent_token(token: str) -> AgentClaims:
 
 placed immediately before the `AccessClaims` construction.
 
-- [ ] **Step 4: Write the protocol**
+- [x] **Step 4: Write the protocol**
 
 `packages/contracts/python/plimsoll_contracts/agent.py`:
 
@@ -1682,7 +1682,7 @@ class Accepted(BaseModel):
     type: Literal["accepted"] = "accepted"
 ```
 
-- [ ] **Step 5: Write the channel**
+- [x] **Step 5: Write the channel**
 
 `apps/api/plimsoll_api/routers/agent.py`:
 
@@ -1830,12 +1830,12 @@ async def _push_commands(websocket: WebSocket, claims: AgentClaims) -> None:
 
 Register it in `main.py` with `app.include_router(agent.router)`.
 
-- [ ] **Step 6: Run the tests and make sure they pass**
+- [x] **Step 6: Run the tests and make sure they pass**
 
 Run: `uv run pytest apps/api/tests/integration/test_agent_channel.py -v -m integration`
 Expected: PASS — five tests. The two refusal tests are the ones that matter: if either passes a connection, the run-scoped token is decorative.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 make contracts && make lint && make typecheck && make test
