@@ -370,6 +370,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tests/{test_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Run
+         * @description Preflight runs first and refuses the whole run, listing every failure.
+         *
+         *     No session is held while it talks to Git, so this endpoint opens three short
+         *     transactions rather than one long one.
+         */
+        post: operations["start_run_api_v1_tests__test_id__runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Runs */
+        get: operations["list_runs_api_v1_projects__project_id__runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Run */
+        get: operations["get_run_api_v1_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Run Status */
+        get: operations["get_run_status_api_v1_runs__run_id__status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -431,6 +505,21 @@ export interface components {
          * @enum {string}
          */
         FindingSeverity: "ERROR" | "WARNING";
+        /**
+         * GeneratorStatus
+         * @enum {string}
+         */
+        GeneratorStatus: "PENDING" | "PROVISIONED" | "REGISTERED" | "FETCHING" | "READY" | "RUNNING" | "STOPPING" | "COMPLETED" | "FAILED" | "LOST";
+        /** GeneratorView */
+        GeneratorView: {
+            /** Ordinal */
+            ordinal: number;
+            status: components["schemas"]["GeneratorStatus"];
+            /** Assignedusers */
+            assignedUsers: number;
+            /** Lastheartbeat */
+            lastHeartbeat: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -477,6 +566,13 @@ export interface components {
         Page_ProjectResponse_: {
             /** Items */
             items: components["schemas"]["ProjectResponse"][];
+            /** Nextcursor */
+            nextCursor?: string | null;
+        };
+        /** Page[RunResponse] */
+        Page_RunResponse_: {
+            /** Items */
+            items: components["schemas"]["RunResponse"][];
             /** Nextcursor */
             nextCursor?: string | null;
         };
@@ -663,6 +759,73 @@ export interface components {
             environment?: string | null;
             /** Tags */
             tags?: string[] | null;
+        };
+        /** RunResponse */
+        RunResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Projectid
+             * Format: uuid
+             */
+            projectId: string;
+            /**
+             * Performancetestid
+             * Format: uuid
+             */
+            performanceTestId: string;
+            /** Runnumber */
+            runNumber: number;
+            status: components["schemas"]["RunStatus"];
+            /** Triggersource */
+            triggerSource: string;
+            /** Degraded */
+            degraded: boolean;
+            /** Startedat */
+            startedAt: string | null;
+            /** Endedat */
+            endedAt: string | null;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Configurationsnapshot */
+            configurationSnapshot: {
+                [key: string]: unknown;
+            };
+            /** Summary */
+            summary?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
+         * RunStatus
+         * @enum {string}
+         */
+        RunStatus: "QUEUED" | "ALLOCATING" | "STARTING" | "RUNNING" | "STOPPING" | "COMPLETED" | "FAILED" | "CANCELLED";
+        /**
+         * RunStatusResponse
+         * @description Deliberately small: this is the endpoint a client polls.
+         */
+        RunStatusResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            status: components["schemas"]["RunStatus"];
+            /** Degraded */
+            degraded: boolean;
+            /** Startedat */
+            startedAt: string | null;
+            /** Endedat */
+            endedAt: string | null;
+            /** Generators */
+            generators: components["schemas"]["GeneratorView"][];
         };
         /** ScriptRepoCreate */
         ScriptRepoCreate: {
@@ -950,6 +1113,11 @@ export interface components {
              * Format: uuid
              */
             generatorPoolId: string;
+            /**
+             * Maxcapacitylosspercent
+             * @default 10
+             */
+            maxCapacityLossPercent: number;
         };
     };
     responses: never;
@@ -2028,6 +2196,133 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PreflightReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_run_api_v1_tests__test_id__runs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                test_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_runs_api_v1_projects__project_id__runs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_RunResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_api_v1_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_status_api_v1_runs__run_id__status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunStatusResponse"];
                 };
             };
             /** @description Validation Error */

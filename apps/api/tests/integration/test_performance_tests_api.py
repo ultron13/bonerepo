@@ -173,3 +173,23 @@ def test_a_viewer_cannot_create_one(
     project_id = _project_id(admin_client)
     body = _body(admin_client, project_id)
     assert viewer_client.post(f"/api/v1/projects/{project_id}/tests", json=body).status_code == 403
+
+
+def test_the_capacity_loss_threshold_defaults_and_round_trips(
+    admin_client: httpx.Client,
+) -> None:
+    project_id = _project_id(admin_client)
+    created = _create(admin_client, project_id)
+    assert created["configuration"]["maxCapacityLossPercent"] == 10
+
+    body = _body(admin_client, project_id)
+    body["configuration"]["maxCapacityLossPercent"] = 25
+    strict = admin_client.post(f"/api/v1/projects/{project_id}/tests", json=body).json()
+    assert strict["configuration"]["maxCapacityLossPercent"] == 25
+
+
+def test_a_threshold_above_a_hundred_is_refused(admin_client: httpx.Client) -> None:
+    project_id = _project_id(admin_client)
+    body = _body(admin_client, project_id)
+    body["configuration"]["maxCapacityLossPercent"] = 150
+    assert admin_client.post(f"/api/v1/projects/{project_id}/tests", json=body).status_code == 422

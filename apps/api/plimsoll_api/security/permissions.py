@@ -22,6 +22,7 @@ class Permission(StrEnum):
     SCRIPT_WRITE = "script.write"
     TEST_READ = "test.read"
     TEST_WRITE = "test.write"
+    TEST_EXECUTE = "test.execute"
     ADMIN_SYSTEM = "admin.system"
 
 

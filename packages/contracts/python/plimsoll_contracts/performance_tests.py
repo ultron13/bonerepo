@@ -42,6 +42,16 @@ class WorkloadSpec(BaseModel):
     generator_pool_id: uuid.UUID = Field(
         alias="generatorPoolId", serialization_alias="generatorPoolId"
     )
+    # What fraction of planned virtual users may be lost before the run is
+    # failed rather than continued and marked degraded. A jsonb field on an
+    # existing column, so no migration.
+    max_capacity_loss_percent: int = Field(
+        default=10,
+        ge=0,
+        le=100,
+        alias="maxCapacityLossPercent",
+        serialization_alias="maxCapacityLossPercent",
+    )
 
     @model_validator(mode="after")
     def _ramp_fits(self) -> WorkloadSpec:
