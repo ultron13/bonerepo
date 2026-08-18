@@ -990,6 +990,7 @@ dev = [
     { name = "ruff" },
     { name = "types-defusedxml" },
     { name = "types-pyyaml" },
+    { name = "websockets" },
 ]
 
 [package.metadata]
@@ -1009,6 +1010,7 @@ dev = [
     { name = "ruff", specifier = ">=0.5" },
     { name = "types-defusedxml", specifier = ">=0.7" },
     { name = "types-pyyaml", specifier = ">=6.0" },
+    { name = "websockets", specifier = ">=14" },
 ]
 
 [[package]]

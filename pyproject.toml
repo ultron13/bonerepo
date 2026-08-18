@@ -32,6 +32,9 @@ dev = [
     "httpx>=0.27",
     # The synchronous driver keeps the migration and isolation tests simple.
     "psycopg[binary]>=3.1",
+    # The agent-channel tests speak WebSocket as a client. 14 is where
+    # additional_headers and InvalidStatus replaced the legacy client.
+    "websockets>=14",
 ]
 
 [tool.ruff]

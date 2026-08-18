@@ -27,6 +27,13 @@ os.environ["PLIMSOLL_CREDENTIAL_KEY"] = os.environ.get(
     "PLIMSOLL_TEST_CREDENTIAL_KEY",
     "ZGV2ZWxvcG1lbnQtb25seS1rZXktMzItYnl0ZXMhISE=",
 )
+# Also the compose stack's. Tests normally receive their tokens from the API's
+# own login endpoint, but an agent token is minted here and presented to the
+# running API, so the two processes must sign with the same secret.
+os.environ["PLIMSOLL_JWT_SECRET"] = os.environ.get(
+    "PLIMSOLL_TEST_JWT_SECRET",
+    "development-only-secret-change-me",
+)
 
 from plimsoll_api.config import get_settings
 from plimsoll_api.db import session as db_session

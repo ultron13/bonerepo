@@ -48,3 +48,57 @@ def decode_access_token(token: str) -> AccessClaims:
         )
     except (KeyError, ValueError, TypeError) as exc:
         raise TokenError("The token is missing a required claim.") from exc
+
+
+AGENT_AUDIENCE = "agent"
+
+
+@dataclass(frozen=True)
+class AgentClaims:
+    run_id: uuid.UUID
+    ordinal: int
+    organization_id: uuid.UUID
+
+
+def issue_agent_token(
+    run_id: uuid.UUID, *, ordinal: int, org_id: uuid.UUID, ttl_seconds: int
+) -> str:
+    """Scoped to one run and one ordinal, and expiring with the run.
+
+    There is no long-lived registration secret on a generator because a
+    generator does not outlive its run -- so neither does its credential.
+
+    The `aud` claim is what keeps the two token families apart in both
+    directions: `decode_access_token` passes no audience, and PyJWT refuses a
+    token that carries one, so an agent token opens no ordinary API route.
+    """
+    now = datetime.now(UTC)
+    payload = {
+        "sub": str(run_id),
+        "ordinal": ordinal,
+        "org": str(org_id),
+        "aud": AGENT_AUDIENCE,
+        "iat": now,
+        "exp": now + timedelta(seconds=ttl_seconds),
+    }
+    return jwt.encode(payload, get_settings().jwt_secret, algorithm=ALGORITHM)
+
+
+def decode_agent_token(token: str) -> AgentClaims:
+    try:
+        payload = jwt.decode(
+            token,
+            get_settings().jwt_secret,
+            algorithms=[ALGORITHM],
+            audience=AGENT_AUDIENCE,
+        )
+    except jwt.PyJWTError as exc:
+        raise TokenError(str(exc)) from exc
+    try:
+        return AgentClaims(
+            run_id=uuid.UUID(payload["sub"]),
+            ordinal=int(payload["ordinal"]),
+            organization_id=uuid.UUID(payload["org"]),
+        )
+    except (KeyError, ValueError, TypeError) as exc:
+        raise TokenError("The token is missing a required claim.") from exc
