@@ -1855,7 +1855,7 @@ git commit -s -m "feat(api): the agent channel, scoped to one run and one ordina
 **Interfaces:**
 - Produces: image `ghcr.io/ultron13/generator:dev`; `plimsoll_agent.lifecycle.next_action(command, state) -> Action`; an agent that registers, heartbeats, waits out its duration, and reports `COMPLETED`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 The agent's decisions are a pure function, so they are tested without a socket.
 
@@ -1897,7 +1897,7 @@ def test_nothing_follows_a_terminal_state() -> None:
     assert next_action(Command.START, AgentState.COMPLETED) is Action.HOLD
 ```
 
-- [ ] **Step 2: Create the package and run the test**
+- [x] **Step 2: Create the package and run the test**
 
 `apps/agent/pyproject.toml`:
 
@@ -1927,7 +1927,7 @@ Add `"apps/agent"` to the workspace members, `plimsoll-agent = { workspace = tru
 Run: `uv sync && uv run pytest apps/agent/tests/unit/test_lifecycle.py -v`
 Expected: FAIL — `ModuleNotFoundError: plimsoll_agent.lifecycle`.
 
-- [ ] **Step 3: Write the lifecycle and the channel**
+- [x] **Step 3: Write the lifecycle and the channel**
 
 `apps/agent/plimsoll_agent/lifecycle.py`:
 
@@ -2114,7 +2114,7 @@ if __name__ == "__main__":
     sys.exit(main())
 ```
 
-- [ ] **Step 4: Write the image**
+- [x] **Step 4: Write the image**
 
 `infrastructure/docker/generator.Dockerfile`:
 
@@ -2169,7 +2169,7 @@ In `seed.py`, point the demo pool at the image that now exists:
 DEMO_POOL_CONFIG = '{"image": "ghcr.io/ultron13/generator:dev"}'
 ```
 
-- [ ] **Step 5: Run the tests and build**
+- [x] **Step 5: Run the tests and build**
 
 Run: `uv run pytest apps/agent/tests/unit/test_lifecycle.py -v`
 Expected: PASS — seven tests.
@@ -2177,7 +2177,7 @@ Expected: PASS — seven tests.
 Run: `make dev-down && make dev && docker image inspect ghcr.io/ultron13/generator:dev --format '{{.Id}}'`
 Expected: an image id. A `--package` flag rejected by uv means the installed version predates it; drop `--package` and let the image install the whole workspace, and note in a comment that it is heavier than it needs to be.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 make lint && make typecheck && make test
