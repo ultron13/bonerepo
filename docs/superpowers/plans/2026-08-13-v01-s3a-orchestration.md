@@ -71,7 +71,7 @@ apps/worker/tests/integration/
 **Interfaces:**
 - Produces: `Delivery(id, stream, payload)`, `MessageBus` protocol, `RedisStreamBus`, `get_bus()`, `RUNS_EXECUTION = "runs.execution"`, `announce(channel, payload)`, `listen(channel)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `apps/api/tests/integration/test_messaging.py`:
 
@@ -162,12 +162,12 @@ async def test_an_announcement_reaches_a_listener() -> None:
     assert received == [{"command": "stop"}]
 ```
 
-- [ ] **Step 2: Run it to make sure it fails**
+- [x] **Step 2: Run it to make sure it fails**
 
 Run: `uv run pytest apps/api/tests/integration/test_messaging.py -v -m integration`
 Expected: FAIL — `ModuleNotFoundError: plimsoll_api.messaging`.
 
-- [ ] **Step 3: Write the bus**
+- [x] **Step 3: Write the bus**
 
 `apps/api/plimsoll_api/messaging.py`:
 
@@ -306,12 +306,12 @@ def get_bus() -> RedisStreamBus:
     return _bus
 ```
 
-- [ ] **Step 4: Run the tests and make sure they pass**
+- [x] **Step 4: Run the tests and make sure they pass**
 
 Run: `uv run pytest apps/api/tests/integration/test_messaging.py -v -m integration`
 Expected: PASS — six tests. If `xautoclaim` rejects `start_id`, the installed redis-py names it positionally; check `redis.asyncio.Redis.xautoclaim` and pass it as the argument after the idle time.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/plimsoll_api/messaging.py apps/api/tests/integration/test_messaging.py
@@ -331,7 +331,7 @@ git commit -s -m "feat(worker): a message bus seam over Redis Streams"
 
 Run creation needs two things `validate` already computes: the inputs, and the commit SHAs preflight resolved. Duplicating either would let the snapshot and the check disagree, which is the one thing [invariant 3](../../../CLAUDE.md) forbids.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `apps/api/tests/integration/test_preflight.py`:
 
@@ -362,12 +362,12 @@ async def test_gather_names_the_repository_behind_each_plan(admin_org: uuid.UUID
     assert inputs.plans[0].plan_path == "perf/checkout.jmx"
 ```
 
-- [ ] **Step 2: Run it to make sure it fails**
+- [x] **Step 2: Run it to make sure it fails**
 
 Run: `uv run pytest apps/api/tests/integration/test_preflight.py -v -m integration -k "assess or gather"`
 Expected: FAIL — `AttributeError: module 'plimsoll_api.services.preflight' has no attribute 'gather'`.
 
-- [ ] **Step 3: Move `_preflight_input` into the service**
+- [x] **Step 3: Move `_preflight_input` into the service**
 
 Cut `_preflight_input` out of `apps/api/plimsoll_api/routers/performance_tests.py` and paste it into `apps/api/plimsoll_api/services/preflight.py` as `gather`, taking `AsyncSession` instead of `TenantSession`:
 
@@ -416,7 +416,7 @@ async def gather(session: AsyncSession, test_id: uuid.UUID) -> PreflightInput:
 
 Add `script_repo_id: uuid.UUID` as the first field of `PlanInput`, and import what the moved function needs: `AsyncSession`, `PlimsollError`, `WorkloadSpec`, and the `credentials`, `performance_tests`, `pools`, `script_repos`, `target_policy` services. In `routers/performance_tests.py`, the `validate` endpoint now calls `preflight.gather(session, test_id)`, and the now-unused imports come out.
 
-- [ ] **Step 4: Return the resolutions**
+- [x] **Step 4: Return the resolutions**
 
 In `services/preflight.py`, keep the check logic in one place and let the caller see what it resolved:
 
@@ -444,12 +444,12 @@ async def run(inputs: PreflightInput) -> PreflightReport:
     return (await assess(inputs)).report
 ```
 
-- [ ] **Step 5: Run the tests and make sure they pass**
+- [x] **Step 5: Run the tests and make sure they pass**
 
 Run: `uv run pytest apps/api/tests/integration/test_preflight.py -v -m integration`
 Expected: PASS — the eight existing tests plus the two new ones. The existing ones passing unchanged is the point: this is a refactor with an addition, not a behaviour change.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 make lint && make typecheck
@@ -469,7 +469,7 @@ git commit -s -m "refactor(api): preflight gathers and reports what it resolved"
 **Interfaces:**
 - Produces: `RunStatus`, `GeneratorStatus`, `RunResponse`, `RunStatusResponse`, `GeneratorView`; `runs_service.create(session, principal, test_id, inputs, resolved) -> Row`; `runs_service.require(session, run_id) -> Row`; `Permission.TEST_EXECUTE`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `apps/api/tests/integration/test_runs_api.py`:
 
@@ -585,12 +585,12 @@ def test_a_viewer_cannot_start_a_run(viewer_client: httpx.Client) -> None:
     assert _start(viewer_client).status_code == 403
 ```
 
-- [ ] **Step 2: Run it to make sure it fails**
+- [x] **Step 2: Run it to make sure it fails**
 
 Run: `uv run pytest apps/api/tests/integration/test_runs_api.py -v -m integration`
 Expected: FAIL — `404` from a path that does not exist yet.
 
-- [ ] **Step 3: Write the contracts**
+- [x] **Step 3: Write the contracts**
 
 `packages/contracts/python/plimsoll_contracts/runs.py`:
 
@@ -681,7 +681,7 @@ class RunStatusResponse(BaseModel):
     generators: list[GeneratorView]
 ```
 
-- [ ] **Step 4: Add the capacity-loss threshold to the workload**
+- [x] **Step 4: Add the capacity-loss threshold to the workload**
 
 The reconciler reads `maxCapacityLossPercent` from the snapshot's workload, so
 the contract has to carry it or the value is never anything but the default. In
@@ -724,7 +724,7 @@ def test_a_threshold_above_a_hundred_is_refused(admin_client: httpx.Client) -> N
     assert admin_client.post(f"/api/v1/projects/{project_id}/tests", json=body).status_code == 422
 ```
 
-- [ ] **Step 5: Add the permission**
+- [x] **Step 5: Add the permission**
 
 In `apps/api/plimsoll_api/security/permissions.py`, add to `Permission`:
 
@@ -734,7 +734,7 @@ In `apps/api/plimsoll_api/security/permissions.py`, add to `Permission`:
 
 `ORG_ADMIN` holds all of `Permission` already, and `READ_PERMISSIONS` is unchanged, so a `VIEWER` does not gain it. Starting load is not the same right as editing a test.
 
-- [ ] **Step 6: Write the repository**
+- [x] **Step 6: Write the repository**
 
 `apps/api/plimsoll_api/repositories/runs.py`:
 
@@ -976,7 +976,7 @@ async def touch_heartbeat(session: AsyncSession, run_id: uuid.UUID, ordinal: int
     )
 ```
 
-- [ ] **Step 7: Write the service**
+- [x] **Step 7: Write the service**
 
 `apps/api/plimsoll_api/services/runs.py`:
 
@@ -1079,7 +1079,7 @@ async def require(session: AsyncSession, run_id: uuid.UUID) -> Any:
     return row
 ```
 
-- [ ] **Step 8: Write the router**
+- [x] **Step 8: Write the router**
 
 `apps/api/plimsoll_api/routers/runs.py`. Allocation is imported from `plimsoll_api.allocation` — pure arithmetic that the API and the worker must agree on, so it has exactly one implementation:
 
@@ -1251,14 +1251,14 @@ Register it in `main.py` beside the others, importing `runs` in the router impor
 
 `preflight.performance_tests` and `preflight.pools` in the snippet above are the service modules `preflight` already imports; if importing them through `preflight` reads badly, import `performance_tests` and `pools` directly in the router instead. `ErrorCode.TEST_NOT_RUNNABLE` and `ErrorCode.INSUFFICIENT_CAPACITY` already exist in `plimsoll_contracts.errors` — check, and add them mapped to `422` if not.
 
-- [ ] **Step 9: Run the tests and make sure they pass**
+- [x] **Step 9: Run the tests and make sure they pass**
 
 This task depends on `plimsoll_api.allocation` from Task 4, which is executed before this one.
 
 Run: `uv run pytest apps/api/tests/integration/test_runs_api.py -v -m integration`
 Expected: PASS — eight tests. A run stays `QUEUED` because nothing consumes the stream yet, which is what the status assertions allow for.
 
-- [ ] **Step 10: Regenerate contracts and commit**
+- [x] **Step 10: Regenerate contracts and commit**
 
 ```bash
 make contracts && make lint && make typecheck && make test
@@ -1283,7 +1283,7 @@ caller. Both processes must agree on how many generators a run gets, and every
 other dependency in this slice runs worker to api -- putting it in the worker
 would make the API import the worker package and stop the two being separable.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `apps/api/tests/unit/test_allocation.py`:
 
@@ -1332,7 +1332,7 @@ def test_zero_users_is_refused() -> None:
         allocate(total_users=0, max_generators=2, max_vus_per_generator=500)
 ```
 
-- [ ] **Step 2: Create the package**
+- [x] **Step 2: Create the package**
 
 `apps/worker/pyproject.toml`:
 
@@ -1367,7 +1367,7 @@ test:
 Run `uv sync` and then the test: `uv run pytest apps/api/tests/unit/test_allocation.py -v`
 Expected: FAIL — `ModuleNotFoundError: plimsoll_api.allocation`.
 
-- [ ] **Step 3: Write the allocator**
+- [x] **Step 3: Write the allocator**
 
 `apps/api/plimsoll_api/allocation.py`:
 
@@ -1410,12 +1410,12 @@ def allocate(
     return [base + (1 if index < remainder else 0) for index in range(generators)]
 ```
 
-- [ ] **Step 4: Run the tests and make sure they pass**
+- [x] **Step 4: Run the tests and make sure they pass**
 
 Run: `uv run pytest apps/api/tests/unit/test_allocation.py -v`
 Expected: PASS — seven tests. `test_every_allocation_sums_to_the_request` is the one that matters; it is a property over 199 cases rather than three examples.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 make lint && make typecheck && make test
