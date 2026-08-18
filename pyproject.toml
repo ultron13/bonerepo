@@ -8,14 +8,16 @@ requires-python = ">=3.12"
 dependencies = [
     "plimsoll-api",
     "plimsoll-contracts",
+    "plimsoll-worker",
 ]
 
 [tool.uv.workspace]
-members = ["apps/api", "packages/contracts/python"]
+members = ["apps/api", "apps/worker", "packages/contracts/python"]
 
 [tool.uv.sources]
 plimsoll-api = { workspace = true }
 plimsoll-contracts = { workspace = true }
+plimsoll-worker = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -47,7 +49,7 @@ ignore = ["S101"]
 "**/tests/**" = ["S105", "S106"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["plimsoll_api", "plimsoll_contracts"]
+known-first-party = ["plimsoll_api", "plimsoll_contracts", "plimsoll_worker"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -62,5 +64,5 @@ mypy_path = ["images/demo-target"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["apps/api/tests"]
+testpaths = ["apps/api/tests", "apps/worker/tests"]
 markers = ["integration: requires the make dev stack"]

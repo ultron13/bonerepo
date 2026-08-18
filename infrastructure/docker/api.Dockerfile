@@ -11,6 +11,7 @@ WORKDIR /srv
 
 COPY pyproject.toml uv.lock ./
 COPY apps/api/pyproject.toml apps/api/
+COPY apps/worker/pyproject.toml apps/worker/
 COPY packages/contracts/python/pyproject.toml packages/contracts/python/
 # Third-party dependencies only. The workspace packages must be skipped here:
 # their source is not copied yet, so an editable build would record a wheel
@@ -19,6 +20,7 @@ RUN uv sync --locked --no-dev --no-install-workspace
 
 COPY packages/contracts/python packages/contracts/python
 COPY apps/api apps/api
+COPY apps/worker apps/worker
 RUN uv sync --locked --no-dev
 
 # The runtime user needs a home for uv's cache and ownership of the virtual

@@ -1,0 +1,7 @@
+The worker's tests are deliberately not a Python package. `apps/api/tests` is
+already the top-level `tests` package, and a second one collides: pytest
+resolves `tests.unit.<module>` against whichever tree it imported first, and
+mypy refuses two modules with the same name. Without __init__.py each file is
+named from its own path and the two trees stay independent.
+
+This file only keeps the directory in Git so `make test` has a path to collect.
