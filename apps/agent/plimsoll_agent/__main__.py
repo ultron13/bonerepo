@@ -84,6 +84,10 @@ async def run_agent() -> int:
 
 
 def main() -> int:
+    if os.environ.get("PLIMSOLL_SLEEP_FOREVER"):
+        # A generator with no run to join, used by the runtime's own tests.
+        asyncio.run(asyncio.sleep(3600))
+        return 0
     return asyncio.run(run_agent())
 
 

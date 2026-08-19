@@ -33,6 +33,7 @@ dev = [
     # Type stubs for runtime dependencies that ship none. Dev-only: they are
     # not needed to run the application, only to check it.
     "types-defusedxml>=0.7",
+    "types-docker>=7.2",
     "types-pyyaml>=6.0",
     "httpx>=0.27",
     # The synchronous driver keeps the migration and isolation tests simple.

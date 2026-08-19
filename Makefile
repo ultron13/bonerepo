@@ -28,7 +28,7 @@ dev-down:
 	$(COMPOSE) down -v
 
 test-int:
-	$(UV) pytest apps/api/tests/integration -v -m integration
+	$(UV) pytest apps/api/tests/integration apps/worker/tests/integration -v -m integration
 
 # Generation runs in a container, so the Docker-and-make-only promise holds.
 # Both containers run as the invoking user, so the output is not root-owned.
