@@ -2450,7 +2450,7 @@ git commit -s -m "feat(worker): generators as containers that never restart"
 **Interfaces:**
 - Produces: `RunView`, `GeneratorRow`, `Decision`, `decide(view) -> Decision`; `Orchestrator.reconcile(run_id, org_id)`; the `worker` compose service.
 
-- [ ] **Step 1: Write the failing unit test**
+- [x] **Step 1: Write the failing unit test**
 
 The decision is pure; everything that touches Docker or the database is applied around it.
 
@@ -2543,12 +2543,12 @@ def test_a_terminal_run_needs_nothing() -> None:
         assert decide(_view(status, [_generator(0, "COMPLETED")])) is Decision.DONE
 ```
 
-- [ ] **Step 2: Run it to make sure it fails**
+- [x] **Step 2: Run it to make sure it fails**
 
 Run: `uv run pytest apps/worker/tests/unit/test_reconciler.py -v`
 Expected: FAIL — `ModuleNotFoundError: plimsoll_worker.reconciler`.
 
-- [ ] **Step 3: Write the decision**
+- [x] **Step 3: Write the decision**
 
 `apps/worker/plimsoll_worker/reconciler.py`:
 
@@ -2662,7 +2662,7 @@ def decide(view: RunView) -> Decision:
 
 `Decision.PROVISION` is returned only from `QUEUED`, and the applying code moves the run to `ALLOCATING` with a conditional update before it creates anything — so the second copy of a duplicated message finds the run already past `QUEUED` and decides `WAIT`.
 
-- [ ] **Step 4: Write the orchestrator and the process**
+- [x] **Step 4: Write the orchestrator and the process**
 
 `apps/worker/plimsoll_worker/__main__.py`:
 
@@ -2938,7 +2938,7 @@ In `docker-compose.yml`, add the service:
 
 The API image must now carry the worker's source: in `infrastructure/docker/api.Dockerfile`, add `COPY apps/worker/pyproject.toml apps/worker/` beside the API's, and `COPY apps/worker apps/worker` beside `COPY apps/api apps/api`.
 
-- [ ] **Step 5: Write the end-to-end test**
+- [x] **Step 5: Write the end-to-end test**
 
 `apps/api/tests/integration/test_run_execution.py`:
 
@@ -3031,12 +3031,12 @@ def test_every_generator_registers_and_heartbeats(admin_client: httpx.Client) ->
     _await_status(admin_client, run_id, TERMINAL)
 ```
 
-- [ ] **Step 6: Run everything**
+- [x] **Step 6: Run everything**
 
 Run: `make dev-down && make dev && uv run pytest apps/worker/tests/unit -v && uv run pytest apps/api/tests/integration/test_run_execution.py -v -m integration`
 Expected: PASS. Read the worker's log with `docker compose -f infrastructure/docker/docker-compose.yml logs worker` when a run stalls; the status endpoint tells you where it stopped and the log tells you why.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 make lint && make typecheck && make test
