@@ -101,6 +101,10 @@ class Orchestrator:
         )
 
         if decision is Decision.DONE:
+            # A run can be ended without the worker's help -- a cancel over
+            # HTTP does exactly that. Whoever ends it, the containers are this
+            # process's to remove, so the last tick reaps before letting go.
+            await self._reap(run.id, org_id)
             return True
         if decision is Decision.PROVISION:
             await self._provision(run, org_id, view)
@@ -204,15 +208,25 @@ class Orchestrator:
                         session, run_id, generator.ordinal, GeneratorStatus.LOST
                     )
 
-    async def _finish(self, run: sa.Row[Any], org_id: uuid.UUID, status: RunStatus) -> None:
+    async def _reap(self, run_id: uuid.UUID, org_id: uuid.UUID) -> list[GeneratorHandle]:
+        """Remove every container the run created.
+
+        Idempotent, which is what lets it run on every terminal path without
+        anyone having to work out whether it already ran: a container that is
+        already gone is the outcome this wanted.
+        """
         async with session_for_org(org_id) as session:
-            rows = await repo.generators_for(session, run.id)
+            rows = await repo.generators_for(session, run_id)
         handles = [
             GeneratorHandle(ordinal=row.ordinal, external_ref=row.external_ref)
             for row in rows
             if row.external_ref
         ]
         await self._runtime.teardown(handles)
+        return handles
+
+    async def _finish(self, run: sa.Row[Any], org_id: uuid.UUID, status: RunStatus) -> None:
+        handles = await self._reap(run.id, org_id)
 
         async with session_for_org(org_id) as session:
             await repo.transition(

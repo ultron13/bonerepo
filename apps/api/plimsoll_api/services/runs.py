@@ -15,6 +15,7 @@ from plimsoll_api.services import audit
 from plimsoll_api.services.preflight import Assessment, PreflightInput
 from plimsoll_contracts.errors import ErrorCode
 from plimsoll_contracts.performance_tests import WorkloadSpec
+from plimsoll_contracts.runs import TERMINAL_RUN_STATUSES, RunStatus
 
 TRIGGER_API = "API"
 
@@ -94,3 +95,50 @@ async def require(session: AsyncSession, run_id: uuid.UUID) -> Any:
     if row is None:
         raise PlimsollError(ErrorCode.NOT_FOUND, "No such run.")
     return row
+
+
+async def request_stop(
+    session: AsyncSession, principal: AccessClaims, run_id: uuid.UUID, *, cancel: bool
+) -> Any:
+    """Idempotent by construction: a state write and an announcement.
+
+    A run already terminal is left alone and answered 200 -- repeating stop on
+    a stopped run must not re-run a side effect (invariant 5).
+    """
+    run = await require(session, run_id)
+    if run.status in TERMINAL_RUN_STATUSES:
+        return run
+
+    # Before RUNNING there is no load to wind down, so a stop is a cancel.
+    abandoning = cancel or run.status != RunStatus.RUNNING
+    if abandoning:
+        moved = await repo.transition(
+            session,
+            run_id,
+            expected=[
+                RunStatus.QUEUED,
+                RunStatus.ALLOCATING,
+                RunStatus.STARTING,
+                RunStatus.RUNNING,
+            ],
+            to=RunStatus.CANCELLED,
+            ended=True,
+        )
+    else:
+        moved = await repo.transition(
+            session, run_id, expected=[RunStatus.RUNNING], to=RunStatus.STOPPING
+        )
+    if moved is None:
+        # Someone got there first. Their transition stands; ours never happened,
+        # so nothing below it runs either -- that is what makes repeating safe.
+        return await require(session, run_id)
+
+    await audit.record(
+        session,
+        principal=principal,
+        action="run.cancelled" if cancel else "run.stopped",
+        entity_type="test_run",
+        entity_id=run_id,
+        metadata={"from": run.status},
+    )
+    return moved

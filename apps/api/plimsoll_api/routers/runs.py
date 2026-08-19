@@ -9,12 +9,13 @@ from plimsoll_api.allocation import CapacityError, allocate
 from plimsoll_api.db.session import session_for_org
 from plimsoll_api.dependencies import CurrentPrincipal, TenantSession
 from plimsoll_api.errors import PlimsollError
-from plimsoll_api.messaging import RUNS_EXECUTION, get_bus
+from plimsoll_api.messaging import RUNS_EXECUTION, get_bus, run_channel
 from plimsoll_api.pagination import page_of, position_from
 from plimsoll_api.repositories import runs as repo
 from plimsoll_api.security.permissions import Permission, requires
 from plimsoll_api.services import performance_tests, pools, preflight, target_policy
 from plimsoll_api.services import runs as service
+from plimsoll_contracts.agent import Command
 from plimsoll_contracts.errors import ErrorCode
 from plimsoll_contracts.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, Page
 from plimsoll_contracts.performance_tests import WorkloadSpec
@@ -157,3 +158,29 @@ async def get_run_status(run_id: uuid.UUID, session: TenantSession) -> RunStatus
             for generator in generators
         ],
     )
+
+
+@router.post(
+    "/api/v1/runs/{run_id}/stop",
+    response_model=RunResponse,
+    dependencies=[Depends(requires(Permission.TEST_EXECUTE))],
+)
+async def stop_run(run_id: uuid.UUID, principal: CurrentPrincipal) -> RunResponse:
+    """Wind the run down: the load stops, and what ran still counts."""
+    async with session_for_org(principal.organization_id) as session:
+        row = await service.request_stop(session, principal, run_id, cancel=False)
+    await get_bus().announce(run_channel(run_id), {"command": Command.STOP.value})
+    return _response(row)
+
+
+@router.post(
+    "/api/v1/runs/{run_id}/cancel",
+    response_model=RunResponse,
+    dependencies=[Depends(requires(Permission.TEST_EXECUTE))],
+)
+async def cancel_run(run_id: uuid.UUID, principal: CurrentPrincipal) -> RunResponse:
+    """Abandon the run: it ends now, and its result is not a result."""
+    async with session_for_org(principal.organization_id) as session:
+        row = await service.request_stop(session, principal, run_id, cancel=True)
+    await get_bus().announce(run_channel(run_id), {"command": Command.CANCEL.value})
+    return _response(row)
