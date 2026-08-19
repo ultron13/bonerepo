@@ -3055,7 +3055,7 @@ git commit -s -m "feat(worker): reconcile a run from queued to completed"
 **Interfaces:**
 - Produces: `POST /runs/{id}/stop`, `POST /runs/{id}/cancel`, both idempotent.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `apps/api/tests/integration/test_run_failure.py`:
 
@@ -3134,12 +3134,12 @@ def test_a_viewer_cannot_stop_a_run(
     _await_status(admin_client, run_id, TERMINAL)
 ```
 
-- [ ] **Step 2: Run it to make sure it fails**
+- [x] **Step 2: Run it to make sure it fails**
 
 Run: `uv run pytest apps/api/tests/integration/test_run_failure.py -v -m integration`
 Expected: FAIL — `404` from `/stop`.
 
-- [ ] **Step 3: Write the endpoints**
+- [x] **Step 3: Write the endpoints**
 
 Add to `services/runs.py`:
 
@@ -3219,12 +3219,12 @@ Import `run_channel` from `plimsoll_api.messaging`.
 
 In the worker, a `STOPPING` run whose generators have all gone terminal is already handled by `Decision.FINISH`; make `_finish` preserve a cancel by passing `RunStatus.CANCELLED` when the run's current status is `CANCELLED` — the conditional update in `_finish` will simply find no row to move, which is the correct outcome, so no change is needed. Verify this with the cancel test rather than assuming it.
 
-- [ ] **Step 4: Run the tests and make sure they pass**
+- [x] **Step 4: Run the tests and make sure they pass**
 
 Run: `uv run pytest apps/api/tests/integration/test_run_failure.py -v -m integration`
 Expected: PASS — five tests. `test_a_killed_generator_never_looks_like_success` is slow by nature: it waits out a heartbeat timeout. If it reports `COMPLETED` with `degraded` false, capacity loss is not being computed — check that the killed generator reaches `LOST` in `GET /runs/{id}/status`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 make contracts && make lint && make typecheck && make test
