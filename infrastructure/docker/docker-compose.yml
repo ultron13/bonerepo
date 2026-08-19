@@ -56,6 +56,35 @@ services:
       minio: {condition: service_healthy}
       script-fixture: {condition: service_healthy}
 
+  worker:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/api.Dockerfile
+    command: ["uv", "run", "python", "-m", "plimsoll_worker"]
+    # The socket is owned by root:docker, and the image's uid 10001 is in
+    # neither. Development only: the host's docker group id is not portable, and
+    # a deployment runs on Kubernetes, where the worker holds an API token
+    # instead of a socket and this override does not exist.
+    user: "0:0"
+    environment:
+      PLIMSOLL_DATABASE_URL: postgresql+asyncpg://plimsoll_app:plimsoll_app_dev@postgres:5432/plimsoll
+      PLIMSOLL_MIGRATION_DATABASE_URL: postgresql+asyncpg://plimsoll_owner:plimsoll_owner_dev@postgres:5432/plimsoll
+      PLIMSOLL_REDIS_URL: redis://redis:6379/0
+      PLIMSOLL_S3_ENDPOINT: http://minio:9000
+      PLIMSOLL_JWT_SECRET: development-only-secret-change-me
+      PLIMSOLL_CREDENTIAL_KEY: ZGV2ZWxvcG1lbnQtb25seS1rZXktMzItYnl0ZXMhISE=
+      PLIMSOLL_ENVIRONMENT: development
+      PLIMSOLL_INTERNAL_API_URL: http://api:8000
+      PLIMSOLL_GENERATOR_NETWORK: plimsoll_default
+    volumes:
+      # Root-equivalent on the host, and mounted here and nowhere else: this is
+      # the only process that creates containers.
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      minio: {condition: service_healthy}
+
   script-fixture:
     build:
       context: ../..

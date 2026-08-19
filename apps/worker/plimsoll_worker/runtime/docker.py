@@ -42,10 +42,20 @@ class DockerRuntime:
         return str(container.id)
 
     async def provision(self, specs: list[GeneratorSpec]) -> list[GeneratorHandle]:
-        handles = []
-        for spec in specs:
-            reference = await asyncio.to_thread(self._create, spec)
-            handles.append(GeneratorHandle(ordinal=spec.ordinal, external_ref=reference))
+        """All of them or none of them.
+
+        A half-provisioned run is worse than a failed one: the containers that
+        were created carry no database row yet, so nothing downstream knows to
+        reap them and they outlive the run that wanted them.
+        """
+        handles: list[GeneratorHandle] = []
+        try:
+            for spec in specs:
+                reference = await asyncio.to_thread(self._create, spec)
+                handles.append(GeneratorHandle(ordinal=spec.ordinal, external_ref=reference))
+        except Exception:
+            await self.teardown(handles)
+            raise
         return handles
 
     def _inspect(self, handle: GeneratorHandle) -> GeneratorState:
