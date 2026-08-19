@@ -2197,7 +2197,7 @@ git commit -s -m "feat(agent): an agent that registers, holds, and reports"
 **Interfaces:**
 - Produces: `GeneratorSpec`, `GeneratorHandle`, `GeneratorRuntime` protocol, `DockerRuntime`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `apps/worker/tests/integration/test_docker_runtime.py`:
 
@@ -2275,12 +2275,12 @@ test-int:
 	$(UV) pytest apps/api/tests/integration apps/worker/tests/integration -v -m integration
 ```
 
-- [ ] **Step 2: Run it to make sure it fails**
+- [x] **Step 2: Run it to make sure it fails**
 
 Run: `uv run pytest apps/worker/tests/integration/test_docker_runtime.py -v -m integration`
 Expected: FAIL — `ModuleNotFoundError: plimsoll_worker.runtime`.
 
-- [ ] **Step 3: Write the runtime**
+- [x] **Step 3: Write the runtime**
 
 `apps/worker/plimsoll_worker/runtime/base.py`:
 
@@ -2425,12 +2425,12 @@ def main() -> int:
     return asyncio.run(run_agent())
 ```
 
-- [ ] **Step 4: Run the tests and make sure they pass**
+- [x] **Step 4: Run the tests and make sure they pass**
 
 Run: `uv run pytest apps/worker/tests/integration/test_docker_runtime.py -v -m integration`
 Expected: PASS — four tests. If the network name is wrong, list it with `docker network ls | grep plimsoll` and use what compose actually created.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 make lint && make typecheck && make test
