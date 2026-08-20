@@ -1,10 +1,16 @@
-.PHONY: test lint typecheck format dev dev-down test-int contracts backup restore-drill
+.PHONY: test lint typecheck format dev dev-down test-int e2e contracts backup restore-drill
 
 UV := uv run
 COMPOSE := docker compose -f infrastructure/docker/docker-compose.yml
 # The web checks run in a container for the same reason the build does: the
 # promise is Docker and make, not a matching local Node.
 WEB := docker run --rm -v "$$PWD/apps/web:/srv" -w /srv node:20-alpine npm
+# Playwright needs a browser and its libraries, which the plain node image
+# does not carry, and it reaches the stack on the host rather than a
+# compose network.
+WEB_E2E := docker run --rm --network host -v "$$PWD/apps/web:/srv" -w /srv \
+  -e PLIMSOLL_WEB_URL=http://localhost:3000 \
+  mcr.microsoft.com/playwright:v1.62.1-noble npx playwright test
 
 test:
 	$(UV) pytest apps/api/tests/unit apps/worker/tests/unit apps/agent/tests/unit \
@@ -35,6 +41,11 @@ dev-down:
 
 test-int:
 	$(UV) pytest apps/api/tests/integration apps/worker/tests/integration -v -m integration
+
+# The seam the API tests cannot reach: what a person sees. Requires `make dev`
+# and a browser, so it runs in a container like everything else.
+e2e:
+	$(WEB_E2E)
 
 backup:
 	./scripts/backup.sh $(DEST)

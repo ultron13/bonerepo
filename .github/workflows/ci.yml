@@ -81,6 +81,9 @@ jobs:
       - name: Integration tests
         run: make test-int
 
+      - name: End-to-end journey
+        run: make e2e
+
       - name: Generated types are committed and current
         run: |
           make contracts
