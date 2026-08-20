@@ -17,7 +17,13 @@ import sqlalchemy as sa
 from hdrh.histogram import HdrHistogram
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from plimsoll_contracts.metrics import MetricKind, decode_sketch, new_sketch, to_bytes
+from plimsoll_contracts.metrics import (
+    MetricKind,
+    decode_sketch,
+    from_bytes,
+    new_sketch,
+    to_bytes,
+)
 
 METRIC_NAME = "transaction.duration"
 ENTITY_TYPE = "transaction"
@@ -66,60 +72,86 @@ def merge_batch(messages: list[dict[str, str]]) -> list[MergedWindow]:
 
 
 async def write(session: AsyncSession, rows: list[MergedWindow]) -> None:
-    """Append one row per merged batch.
+    """One row per window, merged on conflict.
 
-    A window is merged within the batch it arrived in, so two generators whose
-    windows land in different reads leave two rows for the same key. That is
-    additive rather than duplicated -- each row holds a distinct generator's
-    samples, and the read side merges every row for a transaction, so the
-    totals are exact. It is verified against the raw JTLs both generators
-    uploaded, not assumed.
+    Two generators reporting the same window may arrive in different reads, and
+    at-least-once delivery means a batch may arrive twice. Both land here, so
+    the stored sketch is read, merged with the incoming one, and written back
+    inside the same transaction. Replacing would discard the other generator's
+    samples; appending is what the unique index now forbids.
 
-    Two consequences worth knowing before S4b builds on this:
-
-    * A redelivered message would be counted twice. At-least-once is the bus
-      contract, so this is a real if narrow window -- a worker dying between
-      the write and the acknowledgement. Closing it needs a unique key on
-      (run_id, entity_id, time), which a hypertable permits because it
-      includes the partitioning column, and an upsert that merges rather than
-      replaces.
-    * Per-window reads see a window more than once. The run summary is
-      unaffected because it merges everything, but live streaming and
-      continuous aggregates read per window and would show a window twice.
+    Merging a redelivered batch does over-count, and the alternative -- keying
+    on the delivery -- costs a second table. The window this leaves open is a
+    worker dying between the write and the acknowledgement, and the reporting
+    error it produces is bounded by one batch.
     """
     for row in rows:
-        await session.execute(
-            sa.text(
-                "INSERT INTO performance_metrics "
-                "(time, organization_id, run_id, metric_name, metric_kind, "
-                " entity_type, entity_id, value, sketch, tags) "
-                "VALUES (:window, :org, :run, :name, :kind, "
-                "        :entity_type, :entity, :value, :sketch, CAST(:tags AS jsonb))"
-            ),
-            {
-                # A datetime rather than its ISO text: asyncpg infers the
-                # parameter type from the column and refuses a string for it.
-                "window": datetime.fromisoformat(row.window_start),
-                "org": row.organization_id,
-                "run": row.run_id,
-                "name": METRIC_NAME,
-                "kind": str(MetricKind.HISTOGRAM),
-                "entity_type": ENTITY_TYPE,
-                "entity": row.transaction,
-                # A histogram row carries a sketch, never a value: exactly one
-                # of the two is populated, decided by the kind.
-                "value": None,
-                "sketch": to_bytes(row.sketch),
-                # The scalars beside the sketch: enough to answer counts and
-                # throughput without decoding a histogram.
-                "tags": json.dumps(
-                    {
-                        "count": row.count,
-                        "errorCount": row.error_count,
-                        "min": row.minimum,
-                        "max": row.maximum,
-                        "total": row.total,
-                    }
+        window = datetime.fromisoformat(row.window_start)
+        existing = (
+            await session.execute(
+                sa.text(
+                    "SELECT sketch, tags FROM performance_metrics "
+                    "WHERE run_id = :run AND entity_id = :entity AND time = :window "
+                    "FOR UPDATE"
                 ),
-            },
+                {"run": row.run_id, "entity": row.transaction, "window": window},
+            )
+        ).first()
+
+        merged = row.sketch
+        count, errors, total = row.count, row.error_count, row.total
+        minimum, maximum = row.minimum, row.maximum
+        if existing is not None:
+            merged = new_sketch()
+            merged.add(from_bytes(existing.sketch))
+            merged.add(row.sketch)
+            stored = existing.tags or {}
+            count += int(stored.get("count", 0))
+            errors += int(stored.get("errorCount", 0))
+            total += int(stored.get("total", 0))
+            minimum = min(minimum, int(stored.get("min", minimum)))
+            maximum = max(maximum, int(stored.get("max", 0)))
+
+        tags = json.dumps(
+            {
+                "count": count,
+                "errorCount": errors,
+                "min": minimum,
+                "max": maximum,
+                "total": total,
+            }
         )
+        parameters = {
+            "window": window,
+            "org": row.organization_id,
+            "run": row.run_id,
+            "name": METRIC_NAME,
+            "kind": str(MetricKind.HISTOGRAM),
+            "entity_type": ENTITY_TYPE,
+            "entity": row.transaction,
+            # A histogram row carries a sketch, never a value: exactly one of
+            # the two is populated, decided by the kind.
+            "value": None,
+            "sketch": to_bytes(merged),
+            "tags": tags,
+        }
+        if existing is None:
+            await session.execute(
+                sa.text(
+                    "INSERT INTO performance_metrics "
+                    "(time, organization_id, run_id, metric_name, metric_kind, "
+                    " entity_type, entity_id, value, sketch, tags) "
+                    "VALUES (:window, :org, :run, :name, :kind, "
+                    "        :entity_type, :entity, :value, :sketch, CAST(:tags AS jsonb))"
+                ),
+                parameters,
+            )
+        else:
+            await session.execute(
+                sa.text(
+                    "UPDATE performance_metrics "
+                    "SET sketch = :sketch, tags = CAST(:tags AS jsonb) "
+                    "WHERE run_id = :run AND entity_id = :entity AND time = :window"
+                ),
+                parameters,
+            )

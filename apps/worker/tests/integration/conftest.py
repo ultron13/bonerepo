@@ -24,3 +24,21 @@ os.environ.setdefault(
     "PLIMSOLL_CREDENTIAL_KEY",
     "ZGV2ZWxvcG1lbnQtb25seS1rZXktMzItYnl0ZXMhISE=",
 )
+
+from collections.abc import AsyncIterator
+
+import pytest
+
+from plimsoll_api.db import session as db_session
+
+
+@pytest.fixture(autouse=True)
+async def _dispose_pooled_connections() -> AsyncIterator[None]:
+    """The engine is cached across tests but each test gets its own event loop.
+
+    Pooled asyncpg connections are bound to the loop that opened them, so a
+    connection reused by the next test raises "Event loop is closed". Dropping
+    the pool after each test costs a reconnect and removes the coupling.
+    """
+    yield
+    await db_session.get_engine().dispose()
