@@ -91,6 +91,10 @@ services:
       PLIMSOLL_ENVIRONMENT: development
       PLIMSOLL_INTERNAL_API_URL: http://api:8000
       PLIMSOLL_GENERATOR_NETWORK: plimsoll_default
+    # Metrics and liveness. The worker serves nothing else, which is precisely
+    # why it needs this: without it nothing outside can tell a working worker
+    # from a wedged one.
+    ports: ["9100:9100"]
     volumes:
       # Root-equivalent on the host, and mounted here and nowhere else: this is
       # the only process that creates containers.

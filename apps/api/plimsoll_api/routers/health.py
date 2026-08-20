@@ -3,10 +3,12 @@ from __future__ import annotations
 from typing import Protocol
 
 from fastapi import APIRouter, FastAPI
+from fastapi.responses import Response
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from plimsoll_api.config import get_settings
+from plimsoll_api.observability import render
 
 router = APIRouter()
 
@@ -45,3 +47,16 @@ async def readyz(request: Request) -> JSONResponse:
 async def version() -> dict[str, str]:
     settings = get_settings()
     return {"version": settings.version, "gitSha": settings.git_sha}
+
+
+@router.get("/metrics", include_in_schema=False)
+async def metrics() -> Response:
+    """Scraped, not browsed.
+
+    No authentication: a scraper is not a user, and requiring a bearer token
+    here means the numbers are collected by nobody. The endpoint carries no
+    tenant data -- route templates, statuses, and durations -- so there is
+    nothing here to protect that is not already in an access log.
+    """
+    body, content_type = render()
+    return Response(content=body, media_type=content_type)

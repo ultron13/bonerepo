@@ -36,6 +36,12 @@ from plimsoll_api.messaging import (
     probe_channel,
     run_channel,
 )
+from plimsoll_api.observability import (
+    METRIC_WINDOWS,
+    WORKER_DECISIONS,
+    WORKER_FAILURES,
+    mark_tick,
+)
 from plimsoll_api.repositories import pools as pools_repo
 from plimsoll_api.repositories import run_errors as errors_repo
 from plimsoll_api.repositories import runs as repo
@@ -53,6 +59,7 @@ from plimsoll_worker.metrics import merge_batch, write
 from plimsoll_worker.reconciler import Decision, GeneratorRow, RunView, decide, is_silent
 from plimsoll_worker.runtime.base import GeneratorHandle, GeneratorSpec
 from plimsoll_worker.runtime.docker import DockerRuntime
+from plimsoll_worker.serving import serve
 
 TICK_SECONDS = 2
 # The probe consumer's own block. The API waits five seconds for an answer, so
@@ -66,6 +73,8 @@ METRICS_BATCH = 500
 # loops finish the tick they are in and stop; anything longer than this and the
 # kill arrives first, which is the case adoption exists to survive.
 SHUTDOWN_GRACE_SECONDS = 20
+# Where a scraper and a liveness probe find the worker. It serves nothing else.
+SERVE_PORT = int(os.environ.get("PLIMSOLL_WORKER_PORT", "9100"))
 # How much longer than the run an agent's credential stays valid. It covers
 # provisioning, the ramp, and the wind-down; it is not a licence to outlive the
 # run by any margin that matters.
@@ -126,6 +135,7 @@ class Orchestrator:
             max_capacity_loss_percent=int(workload.get("maxCapacityLossPercent", 10)),
         )
         decision = decide(view)
+        WORKER_DECISIONS.labels(decision=decision.name).inc()
         logger.info(
             "run %s is %s with %d generators: %s",
             run_id,
@@ -427,11 +437,16 @@ async def _reconcile_forever(
                 # One run's failure is not every run's. The message stays
                 # unacknowledged, so the next tick tries again from the
                 # database rather than from whatever this attempt left behind.
+                WORKER_FAILURES.labels(stage="reconcile").inc()
                 logger.exception("reconciling run %s failed", run_id)
                 continue
             if finished:
                 await bus.acknowledge(RUNS_EXECUTION, WORKER_GROUP, delivery)
                 del tracked[run_id]
+
+        # Recorded after the pass, not before: the number an alert is built
+        # on has to mean "work completed", not "work attempted".
+        mark_tick()
 
         # A tick is never abandoned half-done: the sleep is what gets cut
         # short, so a reconciliation in flight always finishes.
@@ -522,7 +537,9 @@ async def _ingest_metrics(bus: RedisStreamBus, consumer: str, stopping: asyncio.
                             "p99": str(percentile(row.sketch, 99)),
                         },
                     )
+            METRIC_WINDOWS.inc(len(rows))
         except Exception:
+            WORKER_FAILURES.labels(stage="metrics").inc()
             logger.exception("writing %d metric windows failed", len(windows))
 
         try:
@@ -531,6 +548,7 @@ async def _ingest_metrics(bus: RedisStreamBus, consumer: str, stopping: asyncio.
                 async with session_for_org(org_id) as session:
                     await errors_repo.upsert(session, org_id, uuid.UUID(group["runId"]), group)
         except Exception:
+            WORKER_FAILURES.labels(stage="errors").inc()
             logger.exception("writing %d error groups failed", len(faults))
         for delivery in deliveries:
             await bus.acknowledge(METRICS_INGESTION, METRICS_GROUP, delivery)
@@ -593,6 +611,7 @@ async def main() -> None:
         _reconcile_forever(bus, orchestrator, consumer, stopping),
         _serve_probes(bus, orchestrator, consumer, stopping),
         _ingest_metrics(bus, consumer, stopping),
+        serve(SERVE_PORT, stopping),
     )
     try:
         await asyncio.wait_for(work, timeout=None if not stopping.is_set() else 0)

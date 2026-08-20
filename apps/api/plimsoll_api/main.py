@@ -7,6 +7,7 @@ from plimsoll_api.config import get_settings
 from plimsoll_api.errors import register_error_handlers
 from plimsoll_api.logging import configure_logging
 from plimsoll_api.middleware import request_id_middleware
+from plimsoll_api.observability import measure
 
 
 def create_app() -> FastAPI:
@@ -32,6 +33,9 @@ def create_app() -> FastAPI:
         allow_headers=["authorization", "content-type"],
     )
     app.middleware("http")(request_id_middleware)
+    # After the request-id middleware so a slow request is countable and
+    # traceable by the same identifier.
+    app.middleware("http")(measure)
     register_error_handlers(app)
 
     from plimsoll_api.db.session import get_engine
