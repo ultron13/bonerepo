@@ -160,7 +160,7 @@ DELETE /tests/{id}
 POST   /tests/{id}/validate     # preflight without running
 POST   /tests/{id}/clone        # later slice
 POST   /tests/{id}/schedule     # later slice
-POST   /tests/{id}/runs         # start a run — later slice
+POST   /tests/{id}/runs         # start a run
 ```
 
 A test is one document. Its workload, its plans, and its SLA rules are created,
@@ -192,20 +192,37 @@ disappearing, so the list always carries all six codes.
 
 ### Runs
 ```http
-GET  /runs
+POST /tests/{id}/runs           # start a run
+GET  /projects/{projectId}/runs
 GET  /runs/{id}
 GET  /runs/{id}/status
-GET  /runs/{id}/metrics
-GET  /runs/{id}/transactions
-GET  /runs/{id}/errors
-GET  /runs/{id}/generators
-GET  /runs/{id}/artifacts
 POST /runs/{id}/stop
 POST /runs/{id}/cancel
+
+GET  /runs/{id}/metrics         # later slice
+GET  /runs/{id}/transactions    # later slice
+GET  /runs/{id}/errors          # later slice
+GET  /runs/{id}/generators      # later slice
+GET  /runs/{id}/artifacts       # later slice
 ```
 
+`POST /tests/{id}/runs` runs preflight first and refuses the whole run rather
+than starting one that cannot finish. A test that is not runnable answers `422`
+with `TEST_NOT_RUNNABLE` and carries **every** failing check in
+`details.checks`, in the same shape `POST /tests/{id}/validate` returns — one
+entry per code, so a caller fixes everything in one pass rather than
+rediscovering the next problem on the next attempt.
+
+A created run is `QUEUED` and carries its `configurationSnapshot`: the resolved
+commit SHAs, the workload, the allocation, and the SLA rules. A branch that
+moves mid-run cannot change what executes.
+
+`GET /runs/{id}/status` is the endpoint to poll — deliberately small, carrying
+the run's status, whether it is `degraded`, and one row per generator.
+
 `stop` and `cancel` are idempotent — repeating them on a finished run returns
-`200` with current state, never an error and never a second side effect.
+`200` with current state, never an error and never a second side effect. Before
+`RUNNING` there is no load to wind down, so a stop is a cancel.
 
 ### Generator pools
 ```http
@@ -216,6 +233,16 @@ PATCH  /generator-pools/{id}
 DELETE /generator-pools/{id}
 POST   /generator-pools/{id}/test-connection
 ```
+
+`test-connection` reports whether the pool's runtime is reachable and its image
+present. It answers `200` with `{ok, detail}` either way: an operator fixing a
+pool wants the reason, and a diagnostic that throws tells them less.
+
+The API cannot answer this itself. The container runtime lives in the worker,
+which is the only process holding a Docker socket — giving the API one to
+answer a diagnostic would hand root-equivalent host access to the process that
+serves untrusted requests. So the API asks the worker over the message bus and
+waits briefly; if nothing replies, that is itself the answer.
 
 ### Baselines, reports, admin
 ```http

@@ -198,6 +198,26 @@ export interface paths {
         patch: operations["update_pool_api_v1_generator_pools__pool_id__patch"];
         trace?: never;
     };
+    "/api/v1/generator-pools/{pool_id}/test-connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Pool Connection
+         * @description A diagnostic, not a gate: it reports, and never refuses the request.
+         */
+        post: operations["test_pool_connection_api_v1_generator_pools__pool_id__test_connection_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/target-policy": {
         parameters: {
             query?: never;
@@ -745,6 +765,19 @@ export interface components {
             ok: boolean;
             /** Checks */
             checks: components["schemas"]["Check"][];
+        };
+        /**
+         * ProbeResult
+         * @description Whether a pool could actually run a generator right now.
+         *
+         *     Reported rather than raised: an operator fixing a pool wants the reason,
+         *     and a diagnostic that throws is a diagnostic that tells them less.
+         */
+        ProbeResult: {
+            /** Ok */
+            ok: boolean;
+            /** Detail */
+            detail: string;
         };
         /** ProjectCreate */
         ProjectCreate: {
@@ -1693,6 +1726,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PoolResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_pool_connection_api_v1_generator_pools__pool_id__test_connection_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pool_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProbeResult"];
                 };
             };
             /** @description Validation Error */

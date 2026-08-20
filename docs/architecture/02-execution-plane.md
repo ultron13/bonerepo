@@ -69,8 +69,15 @@ declared by the pool, never assumed globally.
 lifecycle:
 
 1. **Register** with the control plane using its run-scoped token and ordinal.
-2. **Fetch the plan** — shallow, sparse `git clone` at the pinned commit SHA.
-   CSV data files, `.properties`, and the `plimsoll.yaml` manifest resolve by
+2. **Fetch the plan** — download the **staged bundle** the control plane built
+   for this run, from object storage, using a short-lived pre-signed URL. The
+   agent does not clone: a clone per generator would put the repository
+   credential inside every container that runs a user-supplied plan, and a
+   plan can read its own environment. The control plane clones once, where the
+   credential already lives, and ships the result.
+
+   The bundle holds the `.jmx` at the pinned commit SHA together with the CSV
+   data files, `.properties`, and the `plimsoll.yaml` manifest, which resolve by
    relative path because they sit beside the `.jmx` in the repository
    ([script repositories](07-script-repos.md)). Plugins named in the manifest
    must already be present in the generator image or the organisation's plugin
@@ -175,11 +182,8 @@ moving mid-run cannot change what executed.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> DRAFT
-    DRAFT --> READY: validate
-    READY --> SCHEDULED: schedule
-    READY --> ALLOCATING: start
-    SCHEDULED --> ALLOCATING: due
+    [*] --> QUEUED
+    QUEUED --> ALLOCATING: worker claims the run
     ALLOCATING --> STARTING: generators provisioned
     STARTING --> RUNNING: all agents READY
     RUNNING --> STOPPING: stop requested
@@ -189,10 +193,24 @@ stateDiagram-v2
     STARTING --> FAILED: agents failed to start
     RUNNING --> FAILED: capacity loss over threshold
     RUNNING --> CANCELLED: cancel requested
+    QUEUED --> CANCELLED: cancel requested
+    ALLOCATING --> CANCELLED: cancel requested
+    STARTING --> CANCELLED: cancel requested
     COMPLETED --> [*]
     FAILED --> [*]
     CANCELLED --> [*]
 ```
+
+A run begins at `QUEUED`. `DRAFT`, `READY`, and `SCHEDULED` describe a
+*performance test* — a definition that is edited, validated, and scheduled —
+not a run, which exists only once someone has started one. The distinction
+matters because a run is immutable: it carries a snapshot, and nothing about it
+is edited after it is created. Scheduling produces a run when it fires; it is
+not a state a run passes through.
+
+Before `RUNNING` there is no load to wind down, so a stop is a cancel. Both
+`stop` and `cancel` are idempotent, and both answer `200` on a run that has
+already ended.
 
 ## Preflight validation
 

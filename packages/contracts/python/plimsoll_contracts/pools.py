@@ -50,3 +50,14 @@ class PoolResponse(BaseModel):
     supported_engines: list[str] = Field(serialization_alias="supportedEngines")
     status: str
     created_at: datetime = Field(serialization_alias="createdAt")
+
+
+class ProbeResult(BaseModel):
+    """Whether a pool could actually run a generator right now.
+
+    Reported rather than raised: an operator fixing a pool wants the reason,
+    and a diagnostic that throws is a diagnostic that tells them less.
+    """
+
+    ok: bool
+    detail: str

@@ -110,7 +110,7 @@ permits no runs — so there is something to run, and something it is allowed to
 hit, immediately. It also starts a small Git server holding the demo plan, so
 nothing on this path depends on reaching the internet.
 
-### Take the demo from Git to a validated test
+### Take the demo from Git to a finished run
 
 Sign in as the seeded administrator:
 
@@ -160,9 +160,56 @@ inside the allowlist, and the pool has the capacity. To watch it refuse, point
 the plan's `API_HOST` variable somewhere the allowlist does not permit and
 validate again — `TARGET_ALLOWED` fails and names the host.
 
+### Start it, watch it, stop it
+
+Starting a run pins everything it needs first. The response carries a
+`configurationSnapshot` holding the resolved commit SHAs, the workload, and the
+allocation — a branch that moves mid-run cannot change what executed:
+
+```bash
+RUN=$(curl -sX POST -H "$AUTH" "http://localhost:8000/api/v1/tests/$TEST/runs" \
+  | jq -r .id)
+
+curl -s -H "$AUTH" "http://localhost:8000/api/v1/runs/$RUN" \
+  | jq '{status, snapshot: .configurationSnapshot.plans[0].commitSha}'
+```
+
+If preflight fails, no run is created: the answer is `422 TEST_NOT_RUNNABLE`
+carrying every failing check, the same list `validate` returns.
+
+Poll the status endpoint to watch it move `QUEUED → ALLOCATING → STARTING →
+RUNNING`. Each generator is a real container, and `docker ps` shows them appear:
+
+```bash
+watch -n2 "curl -s -H '$AUTH' \
+  http://localhost:8000/api/v1/runs/$RUN/status | jq '{status, degraded, generators}'"
+```
+
+The seeded test runs for five minutes. Stop it early and the load winds down
+while what it measured still counts; `cancel` instead abandons the run. Both are
+idempotent — repeat either as often as you like and the answer stays `200`:
+
+```bash
+curl -sX POST -H "$AUTH" "http://localhost:8000/api/v1/runs/$RUN/stop" | jq .status
+```
+
+When the run ends its containers are removed. A generator that dies mid-run is
+never restarted and never quietly ignored: the run is failed, or marked
+`degraded`, because a result produced with less load than planned must not pass
+as a full one.
+
 Locally, generators are Docker containers. In production the same image runs as
 Kubernetes pods. Only the launcher differs — see
-[ADR-0003](docs/adr/0003-kubernetes-native-generators.md).
+[ADR-0003](docs/adr/0003-kubernetes-native-generators.md). To check that a pool
+can actually launch one:
+
+```bash
+POOL=$(curl -s -H "$AUTH" 'http://localhost:8000/api/v1/generator-pools?limit=200' \
+  | jq -r '.items[] | select(.name=="local-docker") | .id')
+
+curl -sX POST -H "$AUTH" \
+  "http://localhost:8000/api/v1/generator-pools/$POOL/test-connection" | jq
+```
 
 ## Documentation
 

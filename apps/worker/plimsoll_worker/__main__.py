@@ -21,10 +21,13 @@ from plimsoll_api.config import get_settings
 from plimsoll_api.db.session import session_for_org
 from plimsoll_api.logging import configure_logging
 from plimsoll_api.messaging import (
+    POOL_PROBES,
     RUNS_EXECUTION,
     WORKER_GROUP,
     Delivery,
+    RedisStreamBus,
     get_bus,
+    probe_channel,
     run_channel,
 )
 from plimsoll_api.repositories import pools as pools_repo
@@ -37,6 +40,9 @@ from plimsoll_worker.runtime.base import GeneratorHandle, GeneratorSpec
 from plimsoll_worker.runtime.docker import DockerRuntime
 
 TICK_SECONDS = 2
+# The probe consumer's own block. The API waits five seconds for an answer, so
+# this stays well inside that and costs one idle connection between probes.
+PROBE_BLOCK_MS = 2000
 # How much longer than the run an agent's credential stays valid. It covers
 # provisioning, the ramp, and the wind-down; it is not a licence to outlive the
 # run by any margin that matters.
@@ -208,6 +214,9 @@ class Orchestrator:
                         session, run_id, generator.ordinal, GeneratorStatus.LOST
                     )
 
+    async def check_image(self, image: str) -> tuple[bool, str]:
+        return await self._runtime.check(image)
+
     async def _reap(self, run_id: uuid.UUID, org_id: uuid.UUID) -> list[GeneratorHandle]:
         """Remove every container the run created.
 
@@ -239,12 +248,15 @@ class Orchestrator:
             )
 
 
-async def main() -> None:
-    configure_logging(get_settings().log_level)
-    bus = get_bus()
-    await bus.ensure_group(RUNS_EXECUTION, WORKER_GROUP)
-    orchestrator = Orchestrator()
-    consumer = f"worker-{socket.gethostname()}"
+async def _reconcile_forever(
+    bus: RedisStreamBus, orchestrator: Orchestrator, consumer: str
+) -> None:
+    """One run's message is acknowledged only when that run is finished with.
+
+    A worker that dies mid-run leaves it pending, and `reclaim_stale` hands it
+    to whoever is alive -- which is the whole reason the decision is computed
+    from the database rather than remembered.
+    """
     tracked: dict[uuid.UUID, tuple[uuid.UUID, Delivery]] = {}
 
     while True:
@@ -271,6 +283,49 @@ async def main() -> None:
                 del tracked[run_id]
 
         await asyncio.sleep(TICK_SECONDS)
+
+
+async def _serve_probes(bus: RedisStreamBus, orchestrator: Orchestrator, consumer: str) -> None:
+    """Answer pool diagnostics on their own task.
+
+    The API blocks a request on this, so a probe must not wait behind a tick's
+    worth of reconciliation. A probe is acknowledged once answered; an
+    unanswered one is better retried than lost.
+    """
+    while True:
+        deliveries = await bus.read(
+            POOL_PROBES, WORKER_GROUP, consumer, count=5, block_ms=PROBE_BLOCK_MS
+        )
+        for delivery in deliveries:
+            runtime = delivery.payload["runtime"]
+            try:
+                if runtime != "docker":
+                    ok, detail = False, f"No runtime is implemented for {runtime}."
+                else:
+                    ok, detail = await orchestrator.check_image(delivery.payload["image"])
+            except Exception as exc:
+                logger.exception("probing a %s pool failed", runtime)
+                ok, detail = False, f"The probe itself failed: {exc}"
+            await bus.announce(
+                probe_channel(delivery.payload["probeId"]),
+                {"ok": "true" if ok else "false", "detail": detail},
+            )
+            await bus.acknowledge(POOL_PROBES, WORKER_GROUP, delivery)
+
+
+async def main() -> None:
+    configure_logging(get_settings().log_level)
+    bus = get_bus()
+    await bus.ensure_group(RUNS_EXECUTION, WORKER_GROUP)
+    await bus.ensure_group(POOL_PROBES, WORKER_GROUP)
+    orchestrator = Orchestrator()
+    consumer = f"worker-{socket.gethostname()}"
+    # Two loops, one process: a long reconciliation must never delay a probe,
+    # and a probe must never delay a run.
+    await asyncio.gather(
+        _reconcile_forever(bus, orchestrator, consumer),
+        _serve_probes(bus, orchestrator, consumer),
+    )
 
 
 if __name__ == "__main__":

@@ -23,6 +23,10 @@ from redis.exceptions import ResponseError
 from plimsoll_api.config import get_settings
 
 RUNS_EXECUTION = "runs.execution"
+# Diagnostics, asked of the worker because it is the only process holding a
+# container runtime. Kept off the execution stream so a probe can never sit
+# behind a run, nor a run behind a probe.
+POOL_PROBES = "pools.probe"
 WORKER_GROUP = "orchestrators"
 
 
@@ -30,6 +34,11 @@ def run_channel(run_id: Any) -> str:
     """Commands for one run's agents. Namespaced so a listener cannot subscribe
     to another run by guessing a shorter key."""
     return f"runs:{run_id}:commands"
+
+
+def probe_channel(probe_id: Any) -> str:
+    """Where the answer to one probe is published, and nowhere else."""
+    return f"pools:probe:{probe_id}"
 
 
 @dataclass(frozen=True)

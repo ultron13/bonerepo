@@ -11,7 +11,7 @@ from plimsoll_api.repositories import pools as repo
 from plimsoll_api.security.permissions import Permission, requires
 from plimsoll_api.services import pools as service
 from plimsoll_contracts.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, Page
-from plimsoll_contracts.pools import PoolCreate, PoolResponse, PoolUpdate
+from plimsoll_contracts.pools import PoolCreate, PoolResponse, PoolUpdate, ProbeResult
 
 router = APIRouter(prefix="/api/v1/generator-pools", tags=["pools"])
 
@@ -85,3 +85,13 @@ async def delete_pool(
 ) -> Response:
     await service.archive(session, principal, pool_id)
     return Response(status_code=204)
+
+
+@router.post(
+    "/{pool_id}/test-connection",
+    response_model=ProbeResult,
+    dependencies=[Depends(requires(Permission.ADMIN_SYSTEM))],
+)
+async def test_pool_connection(pool_id: uuid.UUID, session: TenantSession) -> ProbeResult:
+    """A diagnostic, not a gate: it reports, and never refuses the request."""
+    return await service.test_connection(session, pool_id)

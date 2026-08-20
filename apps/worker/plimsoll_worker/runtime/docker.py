@@ -14,7 +14,7 @@ import asyncio
 from typing import Any, cast
 
 import docker
-from docker.errors import DockerException, NotFound
+from docker.errors import DockerException, ImageNotFound, NotFound
 
 from plimsoll_worker.runtime.base import GeneratorHandle, GeneratorSpec, GeneratorState
 
@@ -91,3 +91,26 @@ class DockerRuntime:
             return str(policy.get("Name", ""))
 
         return await asyncio.to_thread(read)
+
+    async def check(self, image: str) -> tuple[bool, str]:
+        """Can this runtime create a generator right now, with this image?
+
+        Both halves matter and fail differently: an unreachable daemon is an
+        operator's problem, a missing image is a build or pull that never
+        happened. Saying which one saves the guess.
+        """
+
+        def probe() -> tuple[bool, str]:
+            try:
+                self._client.ping()
+            except DockerException as exc:
+                return False, f"The container runtime is unreachable: {exc}"
+            try:
+                self._client.images.get(image)
+            except ImageNotFound:
+                return False, f"The image {image} is not present on the runtime."
+            except DockerException as exc:
+                return False, f"The image could not be inspected: {exc}"
+            return True, f"The runtime is reachable and {image} is present."
+
+        return await asyncio.to_thread(probe)
