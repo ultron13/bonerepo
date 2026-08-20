@@ -296,7 +296,7 @@ git commit -s -m "feat(contracts): mergeable HDR sketches, and the merge itself"
 **Interfaces:**
 - Produces: `rows_from(text) -> Iterator[Sample]`, `Folder.record(sample)`, `Folder.drain(now) -> list[SketchWindow]`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 The folding is pure and deterministic, so it is tested without a JMeter or a socket.
 
@@ -383,12 +383,12 @@ def test_draining_twice_does_not_repeat_a_window() -> None:
     assert folder.drain(BASE.timestamp() + 30) == []
 ```
 
-- [ ] **Step 2: Run it to make sure it fails**
+- [x] **Step 2: Run it to make sure it fails**
 
 Run: `uv run pytest apps/agent/tests/unit/test_aggregation.py -v`
 Expected: FAIL — `ModuleNotFoundError: plimsoll_agent.aggregation`.
 
-- [ ] **Step 3: Write the parser and the folder**
+- [x] **Step 3: Write the parser and the folder**
 
 `apps/agent/plimsoll_agent/jtl.py` reads JMeter's CSV output incrementally,
 tolerating a partial final line because JMeter is still writing:
@@ -536,12 +536,12 @@ class Folder:
         return drained
 ```
 
-- [ ] **Step 4: Run the tests and make sure they pass**
+- [x] **Step 4: Run the tests and make sure they pass**
 
 Run: `uv run pytest apps/agent/tests/unit -v`
 Expected: PASS — six new tests plus the existing lifecycle and target tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 make lint && make typecheck && make test
