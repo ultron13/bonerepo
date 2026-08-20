@@ -42,11 +42,12 @@ And an operator can:
 Every item above is delivered **through the API**, demonstrated by the
 integration suite and by the `curl` journey in the [README](../README.md).
 
-> **The web interface is not built.** `apps/web` is a README. Each capability
-> listed above can be exercised over HTTP and, for live metrics, over the
-> WebSocket — but a user reading this list would reasonably expect to click
-> rather than curl. v0.1 is not shippable to a non-technical user until the
-> frontend exists, and that is the single largest piece of work remaining.
+> **The web interface covers half the journey.** Signing in, watching runs,
+> and reading what a run measured — live windows, merged percentiles, the SLA
+> verdict per rule, grouped errors — are all clickable at
+> <http://localhost:3000>. *Creating* projects, repositories, and tests is still
+> API-only, and the README's `curl` journey is how they are done. A first-time
+> user therefore cannot get from nothing to a run without the terminal.
 >
 > A Kubernetes generator runtime is also outstanding: pools accept
 > `runtime: kubernetes` and the connectivity probe answers honestly that no

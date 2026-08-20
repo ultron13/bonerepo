@@ -8,8 +8,9 @@ correctly, and gates CI/CD pipelines on SLA outcomes.
 > defines and validates tests, executes them across generator containers running
 > JMeter, merges HDR sketches to report correct percentiles, groups errors,
 > evaluates SLA rules, streams a run live over WebSocket, and hands back the raw
-> artifacts. **The web interface is still specification only** — `apps/web` is a
-> README. Read `docs/architecture/01-overview.md` before writing any code.
+> artifacts. The web interface covers watching a run and reading its results;
+> **creating** projects, repositories, and tests is still API-only. Read
+> `docs/architecture/01-overview.md` before writing any code.
 
 The full specification lives in `docs/`. This file is only the working guide —
 keep it short. Do not paste product specification into it.

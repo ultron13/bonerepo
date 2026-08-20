@@ -110,6 +110,16 @@ permits no runs — so there is something to run, and something it is allowed to
 hit, immediately. It also starts a small Git server holding the demo plan, so
 nothing on this path depends on reaching the internet.
 
+### Watch it in a browser
+
+<http://localhost:3000>, signed in with the seeded administrator, lists the runs
+and opens one: its status, the commit and bundle it is pinned to, windows
+arriving live while it runs, the merged percentiles, the SLA verdict per rule,
+and the failures grouped by what they are.
+
+Creating a project, a repository, and a test is still done over the API — the
+journey below — and the interface takes over from the moment a test exists.
+
 ### Take the demo from Git to a finished run
 
 Sign in as the seeded administrator:
