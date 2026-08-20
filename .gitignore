@@ -12,3 +12,6 @@ dist/
 
 # Ralph loop session state, not project configuration.
 .claude/ralph-loop.local.md
+
+# Screenshots from browser-driven verification.
+run-detail.png

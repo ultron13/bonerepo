@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     # internal endpoint serves both, which is true of a real deployment.
     s3_public_endpoint: str = ""
 
+    # Origins the browser interface is served from. An explicit list, never a
+    # wildcard: this API is reached with a bearer token, and a permissive
+    # origin would let any page a user visits spend it.
+    cors_origins: str = "http://localhost:3000"
+
     access_token_ttl_seconds: int = 900
     refresh_token_ttl_seconds: int = 1_209_600
     environment: str = "development"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from plimsoll_api.config import get_settings
 from plimsoll_api.errors import register_error_handlers
@@ -17,6 +18,18 @@ def create_app() -> FastAPI:
         version=settings.version,
         openapi_url="/api/openapi.json",
         docs_url="/api/docs",
+    )
+    # The interface is a separate origin from the API on purpose: one place a
+    # token lives, and no server-side copy of a credential that belongs to the
+    # person holding the tab. That makes CORS load-bearing rather than
+    # incidental, so the origins are listed rather than opened.
+    origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["authorization", "content-type"],
     )
     app.middleware("http")(request_id_middleware)
     register_error_handlers(app)

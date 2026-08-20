@@ -2,6 +2,9 @@
 
 UV := uv run
 COMPOSE := docker compose -f infrastructure/docker/docker-compose.yml
+# The web checks run in a container for the same reason the build does: the
+# promise is Docker and make, not a matching local Node.
+WEB := docker run --rm -v "$$PWD/apps/web:/srv" -w /srv node:20-alpine npm
 
 test:
 	$(UV) pytest apps/api/tests/unit apps/worker/tests/unit apps/agent/tests/unit \
@@ -10,9 +13,11 @@ test:
 lint:
 	$(UV) ruff check .
 	$(UV) ruff format --check .
+	$(WEB) run lint
 
 typecheck:
 	$(UV) mypy apps packages images
+	$(WEB) run typecheck
 
 format:
 	$(UV) ruff format .
@@ -22,7 +27,7 @@ dev:
 	$(COMPOSE) up --build -d
 	$(COMPOSE) exec -T api uv run alembic -c apps/api/alembic.ini upgrade head
 	$(COMPOSE) exec -T api uv run python -m plimsoll_api.seed
-	@echo "Plimsoll is up. API http://localhost:8000  demo target http://localhost:8080"
+	@echo "Plimsoll is up. Web http://localhost:3000  API http://localhost:8000  demo target http://localhost:8080"
 	@echo "Sign in with admin@demo.plimsoll.dev / plimsoll-demo-password"
 
 dev-down:

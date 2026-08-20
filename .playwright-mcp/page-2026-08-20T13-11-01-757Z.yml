@@ -1,0 +1,11 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - heading "Plimsoll" [level=1] [ref=e4]
+    - generic [ref=e5]:
+      - text: Email
+      - textbox "Email" [ref=e6]: admin@demo.plimsoll.dev
+    - generic [ref=e7]:
+      - text: Password
+      - textbox "Password" [ref=e8]
+    - button "Sign in" [ref=e9] [cursor=pointer]
+  - alert [ref=e10]

@@ -1,0 +1,131 @@
+- generic [active] [ref=e1]:
+  - main [ref=e11]:
+    - heading "Runs" [level=1] [ref=e12]
+    - table [ref=e15]:
+      - rowgroup [ref=e16]:
+        - row [ref=e17]:
+          - columnheader "Run" [ref=e18]
+          - columnheader "Status" [ref=e19]
+          - columnheader "SLA" [ref=e20]
+          - columnheader "Started" [ref=e21]
+      - rowgroup [ref=e22]:
+        - row [ref=e23]:
+          - cell [ref=e24]:
+            - link "#1" [ref=e25] [cursor=pointer]:
+              - /url: /runs/52dfb878-b149-4b7a-8473-8a663787279c
+          - cell "COMPLETED" [ref=e26]
+          - cell "PASS" [ref=e28]
+          - cell "2:46:53 PM" [ref=e30]
+        - row [ref=e31]:
+          - cell [ref=e32]:
+            - link "#1" [ref=e33] [cursor=pointer]:
+              - /url: /runs/783c27dd-8ced-47ba-801a-9ef8a72d3960
+          - cell "COMPLETED" [ref=e34]
+          - cell "PASS" [ref=e36]
+          - cell "2:46:24 PM" [ref=e38]
+        - row [ref=e39]:
+          - cell [ref=e40]:
+            - link "#1" [ref=e41] [cursor=pointer]:
+              - /url: /runs/23f7d9c2-e9a5-448a-8613-393c2f2805fb
+          - cell "CANCELLED" [ref=e42]
+          - cell "—" [ref=e44]
+          - cell "2:46:18 PM" [ref=e45]
+        - row [ref=e46]:
+          - cell [ref=e47]:
+            - link "#1" [ref=e48] [cursor=pointer]:
+              - /url: /runs/ebaa942f-9852-4469-917c-a28853ef7353
+          - cell "COMPLETED" [ref=e49]
+          - cell "PASS" [ref=e51]
+          - cell "2:45:44 PM" [ref=e53]
+        - row [ref=e54]:
+          - cell [ref=e55]:
+            - link "#1" [ref=e56] [cursor=pointer]:
+              - /url: /runs/634558e5-032d-4492-928c-86b3eed4d6ce
+          - cell "COMPLETED" [ref=e57]
+          - cell "PASS" [ref=e59]
+          - cell "2:45:09 PM" [ref=e61]
+        - row [ref=e62]:
+          - cell [ref=e63]:
+            - link "#1" [ref=e64] [cursor=pointer]:
+              - /url: /runs/0a2738be-42e5-4699-892c-46438cc45743
+          - cell "COMPLETED" [ref=e65]
+          - cell "PASS" [ref=e67]
+          - cell "2:44:29 PM" [ref=e69]
+        - row [ref=e70]:
+          - cell [ref=e71]:
+            - link "#1" [ref=e72] [cursor=pointer]:
+              - /url: /runs/0a5d3296-993f-49e1-92e2-4a605d5f9049
+          - cell "COMPLETED" [ref=e73]
+          - cell "PASS" [ref=e75]
+          - cell "2:43:55 PM" [ref=e77]
+        - row [ref=e78]:
+          - cell [ref=e79]:
+            - link "#1" [ref=e80] [cursor=pointer]:
+              - /url: /runs/c007d54f-d948-403d-88e2-fc718a530cd3
+          - cell "COMPLETED" [ref=e81]
+          - cell "FAIL" [ref=e83]
+          - cell "2:43:21 PM" [ref=e85]
+        - row [ref=e86]:
+          - cell [ref=e87]:
+            - link "#1" [ref=e88] [cursor=pointer]:
+              - /url: /runs/56f03cc3-5b23-4955-972e-cc06e37af904
+          - cell "COMPLETED" [ref=e89]
+          - cell "PASS" [ref=e91]
+          - cell "2:42:39 PM" [ref=e93]
+        - row [ref=e94]:
+          - cell [ref=e95]:
+            - link "#1" [ref=e96] [cursor=pointer]:
+              - /url: /runs/0d4e44d4-9d8b-48d2-968c-7e48fc4239f9
+          - cell "COMPLETED" [ref=e97]
+          - cell "PASS" [ref=e99]
+          - cell "2:41:49 PM" [ref=e101]
+        - row [ref=e102]:
+          - cell [ref=e103]:
+            - link "#1" [ref=e104] [cursor=pointer]:
+              - /url: /runs/7bd53b7c-ed8a-4cc3-bddd-4294903eb273
+          - cell "FAILED" [ref=e105]
+          - cell "—" [ref=e107]
+          - cell "2:41:04 PM" [ref=e108]
+        - row [ref=e109]:
+          - cell [ref=e110]:
+            - link "#1" [ref=e111] [cursor=pointer]:
+              - /url: /runs/c197432b-b261-4fe4-8691-aa5153f80c23
+          - cell "CANCELLED" [ref=e112]
+          - cell "—" [ref=e114]
+          - cell "2:40:55 PM" [ref=e115]
+        - row [ref=e116]:
+          - cell [ref=e117]:
+            - link "#1" [ref=e118] [cursor=pointer]:
+              - /url: /runs/53071456-83f9-468b-9fcf-702d3c596a66
+          - cell "COMPLETED" [ref=e119]
+          - cell "PASS" [ref=e121]
+          - cell "2:40:31 PM" [ref=e123]
+        - row [ref=e124]:
+          - cell [ref=e125]:
+            - link "#1" [ref=e126] [cursor=pointer]:
+              - /url: /runs/77b2a2ba-cc71-42c5-b670-8a2f419cded3
+          - cell "COMPLETED" [ref=e127]
+          - cell "PASS" [ref=e129]
+          - cell "2:40:16 PM" [ref=e131]
+        - row [ref=e132]:
+          - cell [ref=e133]:
+            - link "#1" [ref=e134] [cursor=pointer]:
+              - /url: /runs/1dea1056-1181-4084-b5ca-3bd522b22a24
+          - cell "COMPLETED" [ref=e135]
+          - cell "PASS" [ref=e137]
+          - cell "2:39:48 PM" [ref=e139]
+        - row [ref=e140]:
+          - cell [ref=e141]:
+            - link "#1" [ref=e142] [cursor=pointer]:
+              - /url: /runs/da9eb5e2-6252-483e-b733-b507b61896c7
+          - cell "COMPLETED" [ref=e143]
+          - cell "PASS" [ref=e145]
+          - cell "2:39:00 PM" [ref=e147]
+        - row [ref=e148]:
+          - cell [ref=e149]:
+            - link "#1" [ref=e150] [cursor=pointer]:
+              - /url: /runs/f67d7d06-39ad-4709-aee1-1ec7633757b6
+          - cell "COMPLETED" [ref=e151]
+          - cell "PASS" [ref=e153]
+          - cell "2:38:16 PM" [ref=e155]
+  - alert [ref=e10]

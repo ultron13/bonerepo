@@ -56,6 +56,7 @@ services:
       # 32 bytes, base64url. Development only; a deployment generates its own.
       PLIMSOLL_CREDENTIAL_KEY: ZGV2ZWxvcG1lbnQtb25seS1rZXktMzItYnl0ZXMhISE=
       PLIMSOLL_ENVIRONMENT: development
+      PLIMSOLL_CORS_ORIGINS: http://localhost:3000
     ports: ["8000:8000"]
     depends_on:
       postgres: {condition: service_healthy}
@@ -98,6 +99,18 @@ services:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
       minio: {condition: service_healthy}
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/web.Dockerfile
+      args:
+        # The browser reaches the API on the published port, not the compose
+        # network name, because it resolves names on the host.
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports: ["3000:3000"]
+    depends_on:
+      api: {condition: service_started}
 
   script-fixture:
     build:
