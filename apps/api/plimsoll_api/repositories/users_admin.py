@@ -46,7 +46,9 @@ async def insert(
     email: str,
     name: str,
     org_role: str,
-    password_hash: str,
+    # None for a user who signs in through an identity provider: there is no
+    # local credential, and `authenticate` refuses a NULL password_hash.
+    password_hash: str | None,
 ) -> sa.Row[Any]:
     return (
         await session.execute(

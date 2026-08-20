@@ -37,3 +37,31 @@ async def record(
         entity_id=entity_id,
         metadata=metadata,
     )
+
+
+async def record_for_user(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    user_id: uuid.UUID,
+    action: str,
+    entity_type: str | None = None,
+    entity_id: uuid.UUID | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    """For what happens before there is a principal to attribute it to.
+
+    Signing in is the case: the trail should record it, and at the moment it
+    happens the person has no access token to be identified by. The user is
+    known -- that is what just got established -- so the entry names them.
+    """
+    await repo.insert(
+        session,
+        org_id=org_id,
+        user_id=user_id,
+        api_key_id=None,
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        metadata=metadata,
+    )

@@ -56,6 +56,9 @@ services:
       # 32 bytes, base64url. Development only; a deployment generates its own.
       PLIMSOLL_CREDENTIAL_KEY: ZGV2ZWxvcG1lbnQtb25seS1rZXktMzItYnl0ZXMhISE=
       PLIMSOLL_ENVIRONMENT: development
+      # The provider fixture is a container on a private network with no
+      # certificate. A deployment leaves this off and uses https.
+      PLIMSOLL_OIDC_ALLOW_INSECURE_ISSUER: "true"
       PLIMSOLL_CORS_ORIGINS: http://localhost:3000
     ports: ["8000:8000"]
     depends_on:
@@ -63,6 +66,7 @@ services:
       redis: {condition: service_healthy}
       minio: {condition: service_healthy}
       script-fixture: {condition: service_healthy}
+      idp-fixture: {condition: service_healthy}
 
   worker:
     build:
@@ -125,6 +129,20 @@ services:
       # 127.0.0.1, not localhost: nginx listens on IPv4 and localhost resolves
       # to ::1 first, which would fail a healthy container.
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1/public/plans.git/info/refs?service=git-upload-pack"]
+      interval: 3s
+      retries: 20
+
+  idp-fixture:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/idp-fixture.Dockerfile
+    environment:
+      # The issuer has to be the name the API resolves, because it is both the
+      # trust anchor and the host discovery is fetched from.
+      IDP_ISSUER: http://idp-fixture
+    ports: ["8082:80"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1/jwks')"]
       interval: 3s
       retries: 20
 

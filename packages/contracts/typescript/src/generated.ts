@@ -159,6 +159,87 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/identity-provider": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Current
+         * @description The stored secret is never returned. It was written once and is only
+         *     read by the token exchange.
+         */
+        get: operations["current_api_v1_identity_provider_get"];
+        /**
+         * Configure
+         * @description Reachability is proven before the configuration is stored.
+         *
+         *     A provider saved without checking is one whose first failure happens to
+         *     somebody trying to sign in, with nothing to tell them why. Discovery is
+         *     also what confirms the issuer speaks for itself.
+         */
+        put: operations["configure_api_v1_identity_provider_put"];
+        post?: never;
+        /**
+         * Remove
+         * @description Idempotent: removing what is already absent is the outcome wanted.
+         */
+        delete: operations["remove_api_v1_identity_provider_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/oidc/{slug}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Start
+         * @description Send somebody to their organisation's identity provider.
+         *
+         *     The slug is the only thing the caller supplies, and all it can do is choose
+         *     which provider they are sent to -- it cannot make them anybody. A slug that
+         *     names no provider is refused the same way a wrong one is, so this is not a
+         *     way to enumerate which organisations use single sign-on.
+         */
+        get: operations["start_api_v1_auth_oidc__slug__start_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/oidc/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Callback
+         * @description Finish the flow and issue this deployment's own tokens.
+         *
+         *     The provider's answer is never trusted further than the ID token it is
+         *     signed into. Nothing from the query string decides who the caller becomes.
+         */
+        get: operations["callback_api_v1_auth_oidc_callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users": {
         parameters: {
             query?: never;
@@ -948,6 +1029,48 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** IdentityProvider */
+        IdentityProvider: {
+            /** Id */
+            id: string;
+            /** Issuer */
+            issuer: string;
+            /** Clientid */
+            clientId: string;
+            /** Groupsclaim */
+            groupsClaim: string;
+            /** Admingroup */
+            adminGroup: string | null;
+            /** Alloweddomains */
+            allowedDomains: string[];
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Starturl */
+            startUrl: string;
+        };
+        /** IdentityProviderInput */
+        IdentityProviderInput: {
+            /** Issuer */
+            issuer: string;
+            /** Clientid */
+            clientId: string;
+            /** Clientsecret */
+            clientSecret: string;
+            /**
+             * Groupsclaim
+             * @default groups
+             */
+            groupsClaim: string;
+            /** Admingroup */
+            adminGroup?: string | null;
+            /** Alloweddomains */
+            allowedDomains: string[];
         };
         /** LoginRequest */
         LoginRequest: {
@@ -1952,6 +2075,141 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    current_api_v1_identity_provider_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityProvider"];
+                };
+            };
+        };
+    };
+    configure_api_v1_identity_provider_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdentityProviderInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityProvider"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_api_v1_identity_provider_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    start_api_v1_auth_oidc__slug__start_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    callback_api_v1_auth_oidc_callback_get: {
+        parameters: {
+            query: {
+                state: string;
+                code?: string | null;
+                error?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
             };
             /** @description Validation Error */
             422: {

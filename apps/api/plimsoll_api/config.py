@@ -23,6 +23,22 @@ class Settings(BaseSettings):
     # is a data loss rather than a rotation.
     credential_keys_retired: str = ""
 
+    # Where this deployment is reachable from outside. Single sign-on needs
+    # both: the redirect URI is registered at the identity provider and must
+    # match to the character, and the browser has to be sent somewhere real
+    # afterwards. Deriving them from the request would let a forwarded host
+    # header choose where a sign-in lands.
+    public_api_url: str = "http://localhost:8000"
+    public_web_url: str = "http://localhost:3000"
+
+    # The issuer is the trust anchor for single sign-on: over plain HTTP
+    # anything on the path can rewrite the discovery document, and with it
+    # every endpoint and the key set tokens are checked against. Off by
+    # default, so a deployment that wants it has to say so. The development
+    # compose says so, because its provider fixture is a container on a
+    # private network with no certificate.
+    oidc_allow_insecure_issuer: bool = False
+
     # Defaults exist so a unit test can build the application without them.
     # The compose values are the same because this is the development MinIO; a
     # deployment sets all of them.

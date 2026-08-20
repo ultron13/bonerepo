@@ -149,9 +149,22 @@ revokes the user's token families, and `refresh` refuses an inactive account.
 The last active administrator cannot be demoted or deactivated, because an
 organisation with nobody who can administer it has no way back.
 
-**Still open:** OIDC, and organisations as a product surface — creating one,
-and roles beyond `ORG_ADMIN` and `VIEWER`. The roadmap puts SSO at v0.3 and
-notes it gates enterprise pilots.
+**Fixed: OIDC single sign-on.** Authorisation code with PKCE, per
+organisation. Each check an identity token goes through was verified to be
+load-bearing by removing it and watching the right test fail: signature,
+issuer, audience, nonce, expiry, and `email_verified`. Group membership maps
+to roles in both directions, and the last-administrator guard still holds so a
+group edit at the provider cannot leave an organisation unadministrable.
+Deactivating a user stops them signing in this way too.
+
+A provider fixture ships with the stack, because single sign-on cannot be
+demonstrated or tested without one and pointing `make dev` at somebody else's
+service would put it on the critical path of a local start-up. It signs real
+RS256 tokens with a real key, and can be asked for the tokens that should be
+refused — which is the reason to write one rather than use one.
+
+**Still open:** organisations as a product surface — creating one, and roles
+beyond `ORG_ADMIN` and `VIEWER`.
 
 ### 8. Operational edges
 
@@ -172,8 +185,9 @@ notes it gates enterprise pilots.
 9. ~~Backup and restore; `make e2e`; the web interface's missing half~~ — done
 10. ~~Credential key rotation~~ — done
 11. ~~Pin the generator pool in the run snapshot~~ — done
-12. OIDC, and organisations as a product surface
-13. A load test end to end on Kubernetes; Terraform
+12. ~~OIDC single sign-on~~ — done
+13. Organisations as a product surface; roles beyond two
+14. A load test end to end on Kubernetes; Terraform
 
 Each is landed the way the rest of this repository was: a failing test first,
 the change, then the gates.

@@ -70,6 +70,64 @@ Run it on a schedule, not after an incident.
   run. Any that survive the incident are adopted or reaped by the worker.
 - **Redis streams.** See above.
 
+## Single sign-on
+
+An organisation configures one identity provider. Anyone with `admin.system`
+can, and it is written to the audit trail either way.
+
+```bash
+curl -X PUT https://plimsoll.example.com/api/v1/identity-provider \
+  -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{
+        "issuer": "https://login.example.com",
+        "clientId": "plimsoll",
+        "clientSecret": "...",
+        "groupsClaim": "groups",
+        "adminGroup": "plimsoll-admins",
+        "allowedDomains": ["example.com"]
+      }'
+```
+
+The response carries `startUrl` — the link to publish internally. Register
+`https://<your-api>/api/v1/auth/oidc/callback` as the redirect URI at the
+provider; it must match to the character.
+
+Only an issuer is configured, because every endpoint below it can move and the
+provider is the only thing that knows where they are now. Reachability is
+checked before the configuration is stored, so a provider that cannot be
+reached fails for the administrator setting it up rather than for the first
+person trying to sign in.
+
+**`allowedDomains` has no default and cannot be empty.** A provider that has
+not said which domains it speaks for should not be able to create an account
+for any address at all. An address outside the list gets no account, however
+valid its token.
+
+**An unverified email address gets no account either.** That is the route
+somebody who can register at the provider would use to choose a colleague's
+address and inherit their account.
+
+**Group membership is authoritative in both directions.** Somebody added to
+`adminGroup` becomes an administrator on their next sign-in; somebody removed
+from it stops being one. Honouring it only in the granting direction would mean
+the group controls promotion and nothing controls demotion. The last active
+administrator is still protected — otherwise a group edit at the provider could
+leave an organisation with nobody able to fix the configuration that caused it.
+
+Accounts created this way have no password. `password_hash` is NULL, and
+authentication refuses that, so there is no local credential to guess rather
+than an unknown one.
+
+Deactivating a user through `/api/v1/users/{id}/deactivate` also stops them
+signing in through the provider. Offboarding that a second sign-in route walks
+around is not offboarding.
+
+The issuer must be `https://`. `PLIMSOLL_OIDC_ALLOW_INSECURE_ISSUER` relaxes
+that and exists for the development fixture, which is a container on a private
+network with no certificate. Anything on the path to a plain-HTTP provider can
+rewrite its discovery document, and with it the keys every identity token is
+checked against.
+
 ## Rotating the credential key
 
 `PLIMSOLL_CREDENTIAL_KEY` encrypts the credentials table. A key that cannot be
