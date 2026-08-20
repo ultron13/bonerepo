@@ -47,6 +47,15 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     },
   });
 
+  if (response.status === 401) {
+    // The access token has a short life and this client does not yet rotate
+    // its refresh token, so an expired session becomes a sign-in rather than a
+    // page of failures the user cannot act on.
+    clearToken();
+    if (typeof window !== "undefined") window.location.href = "/";
+    throw new ApiError(401, "UNAUTHENTICATED", "The session has expired.");
+  }
+
   if (!response.ok) {
     // The API answers a documented error envelope; surfacing its message is
     // what makes a refusal actionable rather than a status code.
