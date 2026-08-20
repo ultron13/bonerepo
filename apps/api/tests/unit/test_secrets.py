@@ -16,8 +16,13 @@ def test_a_secret_survives_a_round_trip() -> None:
     assert provider.decrypt(ciphertext, key_ref) == b"ghp_notarealtoken"
 
 
-def test_the_key_reference_names_the_provider_and_version() -> None:
-    assert _provider().encrypt(b"x")[1] == "local:v1"
+def test_the_key_reference_names_the_provider_and_the_key() -> None:
+    """The provider so an unavailable backend is recognised as such, and the
+    key so a row can say which one opens it -- which is what makes rotation
+    something other than data loss."""
+    reference = _provider().encrypt(b"x")[1]
+    assert reference.startswith("local:")
+    assert len(reference) > len("local:")
 
 
 def test_the_same_plaintext_encrypts_differently_each_time() -> None:

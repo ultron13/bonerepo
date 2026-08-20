@@ -70,6 +70,40 @@ Run it on a schedule, not after an incident.
   run. Any that survive the incident are adopted or reaped by the worker.
 - **Redis streams.** See above.
 
+## Rotating the credential key
+
+`PLIMSOLL_CREDENTIAL_KEY` encrypts the credentials table. A key that cannot be
+rotated is a key that cannot be leaked safely, and until recently changing it
+made every stored credential permanently unreadable.
+
+**Deploy first.** A version that understands per-key references has to be
+running before anything is re-encrypted. Rotating underneath an older build
+leaves rows it refuses to open — verified the hard way while building this.
+
+Then:
+
+1. Put the new key in `PLIMSOLL_CREDENTIAL_KEY` and move the outgoing one into
+   `PLIMSOLL_CREDENTIAL_KEYS_RETIRED`. Restart. Everything still opens: a
+   retired key still decrypts what it wrote.
+2. Re-encrypt:
+
+   ```bash
+   PLIMSOLL_ROTATION_DATABASE_URL=postgresql+asyncpg://postgres:...@host/plimsoll \
+     uv run python scripts/rotate-credential-key.py
+   ```
+
+3. Remove the retired key and restart. Nothing references it any more.
+
+Between steps one and three the deployment holds both keys, which is the point:
+a rotation that requires an outage is a rotation that does not happen.
+
+The script needs an operator connection rather than the application's.
+Row-level security is forced on every tenant table — it applies to the table
+owner too, and only a superuser is outside it — so a job that touches every
+organisation's rows uses the same class of credential `pg_dump` does. Nothing
+reachable from the application can read across organisations, maintenance
+included.
+
 ## Health and metrics
 
 | Endpoint | Purpose |

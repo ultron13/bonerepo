@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     # Encrypts the credentials table. No default: a built-in key is the same as
     # no encryption, discovered later.
     credential_key: str
+    # Keys that no longer encrypt anything but still open rows written before
+    # the last rotation. Comma-separated. A rotation adds the outgoing key
+    # here, re-encrypts, and then removes it -- without this step the rotation
+    # is a data loss rather than a rotation.
+    credential_keys_retired: str = ""
 
     # Defaults exist so a unit test can build the application without them.
     # The compose values are the same because this is the development MinIO; a
