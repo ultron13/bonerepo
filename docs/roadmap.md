@@ -26,7 +26,7 @@ A user can:
 - [x] Stop a run cleanly, idempotently
 - [x] See results with **correctly merged** percentiles
 - [ ] See grouped errors with counts and samples
-- [ ] See SLA pass/fail per rule
+- [x] See SLA pass/fail per rule
 - [x] Download raw run artifacts
 
 And an operator can:

@@ -57,14 +57,14 @@ per-window read sees the window twice, and a redelivered message counts twice.
 The evaluation is pure, which is what lets it be tested exhaustively without a
 run: rules in, verdict out.
 
-- [ ] **Step 1: Write the failing test.** Cover each operator, each severity,
+- [x] **Step 1: Write the failing test.** Cover each operator, each severity,
       the worst-verdict-wins rule, a rule naming a transaction that produced no
       data (`SKIPPED`, never `PASS`), and a degraded run.
-- [ ] **Step 2: Write the evaluator.**
-- [ ] **Step 3: Evaluate at completion** in the worker's `_finish`, against the
+- [x] **Step 2: Write the evaluator.**
+- [x] **Step 3: Evaluate at completion** in the worker's `_finish`, against the
       merged summary S4a already computes.
-- [ ] **Step 4: Expose it** on the run response, regenerate contracts.
-- [ ] **Step 5: Run everything and commit.**
+- [x] **Step 4: Expose it** on the run response, regenerate contracts.
+- [x] **Step 5: Run everything and commit.**
 
 ---
 
