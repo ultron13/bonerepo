@@ -52,7 +52,7 @@ packages/contracts/python/plimsoll_contracts/
 **Interfaces:**
 - Produces: `MetricKind`, `new_sketch()`, `encode_sketch()`, `decode_sketch()`, `merge_sketches()`, `percentile()`, `SketchWindow`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 This is the one piece where a bug is silent and expensive, so the test states the property that matters: merging then deriving is not the same as deriving then averaging, and the merged answer is the true one.
 
@@ -141,12 +141,12 @@ def test_precision_is_within_the_documented_bound() -> None:
     assert abs(percentile(sketch, 95) - exact) / exact < 0.01
 ```
 
-- [ ] **Step 2: Run it to make sure it fails**
+- [x] **Step 2: Run it to make sure it fails**
 
 Run: `uv run pytest packages/contracts/python/tests -v`
 Expected: FAIL — `ModuleNotFoundError: plimsoll_contracts.metrics`.
 
-- [ ] **Step 3: Write the contract**
+- [x] **Step 3: Write the contract**
 
 Add `"hdrhistogram>=0.10"` to `packages/contracts/python/pyproject.toml`, add `"packages/contracts/python/tests"` to the root `testpaths`, and extend `make test`. Do **not** add an `__init__.py` to the new tests directory — `tests` is already a package name owned by `apps/api/tests`, and a second one breaks mypy and collection.
 
@@ -271,12 +271,12 @@ class SketchWindow:
 Note `base64` is imported for clarity of intent even though `hdrh` already
 returns base64 bytes from `encode()`; drop the import if ruff flags it.
 
-- [ ] **Step 4: Run the tests and make sure they pass**
+- [x] **Step 4: Run the tests and make sure they pass**
 
 Run: `uv run pytest packages/contracts/python/tests -v`
 Expected: PASS — five tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 make lint && make typecheck && make test
