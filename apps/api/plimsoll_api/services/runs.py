@@ -28,6 +28,7 @@ def build_snapshot(
     allocation: list[int],
     target_policy_version: int,
     sla_rules: list[dict[str, Any]],
+    pool: Any,
 ) -> dict[str, Any]:
     """Everything the run needs, resolved, so nothing read after it starts
     comes from mutable configuration."""
@@ -48,6 +49,19 @@ def build_snapshot(
         "slaRules": sla_rules,
         "targetPolicyVersion": target_policy_version,
         "allowlist": inputs.allowlist,
+        # The pool as it was when the run was accepted. Without this the
+        # image, the runtime and the sizing were read live at provision time,
+        # minutes later: a pool edited in that window changed what executed,
+        # past the preflight that had approved something else. Switching a
+        # pool's runtime was worse -- teardown would look in the runtime the
+        # pool names now, find nothing, and leave the generators running.
+        "pool": {
+            "id": str(pool.id),
+            "runtime": pool.runtime,
+            "image": str(dict(pool.config)["image"]),
+            "memoryLimit": dict(pool.config).get("memoryLimit"),
+            "cpuLimit": dict(pool.config).get("cpuLimit"),
+        },
     }
 
 

@@ -1,0 +1,40 @@
+# Migrations run before the new pods do, and the release fails if they fail.
+# Running them from an init container in the API deployment would instead run
+# them once per replica, concurrently, against one database.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-migrate-{{ .Release.Revision }}
+  labels:
+    {{- include "plimsoll.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        {{- include "plimsoll.labels" . | nindent 8 }}
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: Never
+      {{- include "plimsoll.podSecurity" . | nindent 6 }}
+      containers:
+        - name: migrate
+          image: "{{ .Values.image.registry }}/plimsoll-api:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["uv", "run", "alembic", "-c", "apps/api/alembic.ini", "upgrade", "head"]
+          env:
+            {{- include "plimsoll.env" . | nindent 12 }}
+            # Migrations run as the owner; the application never does.
+            - name: PLIMSOLL_MIGRATION_DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.existingSecret }}, key: migrationDatabaseUrl }
+          {{- include "plimsoll.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: {}

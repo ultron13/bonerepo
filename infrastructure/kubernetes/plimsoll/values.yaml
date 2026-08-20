@@ -1,0 +1,63 @@
+# Postgres, Redis and the object store are not in this chart. Running a
+# database as a chart dependency makes it as disposable as the application in
+# front of it, and the one thing here that must not be disposable is the
+# database. Point these at what you already operate.
+image:
+  registry: ghcr.io/ultron13
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+namespace: plimsoll
+
+api:
+  replicas: 2
+  resources:
+    requests: { cpu: "250m", memory: "512Mi" }
+    limits: { cpu: "1", memory: "1Gi" }
+
+worker:
+  # One. The reconciler is not partitioned, so two workers would both act on
+  # the same run: two sets of generators for one experiment, and each tearing
+  # down what the other created. Scaling this needs leader election or
+  # sharding by run, and neither exists yet -- so the chart refuses to pretend.
+  replicas: 1
+  resources:
+    requests: { cpu: "250m", memory: "512Mi" }
+    limits: { cpu: "1", memory: "1Gi" }
+
+web:
+  replicas: 2
+  resources:
+    requests: { cpu: "100m", memory: "256Mi" }
+    limits: { cpu: "500m", memory: "512Mi" }
+
+generators:
+  # The namespace generators are created in. Separate from the control plane's
+  # so a generator cannot reach a control-plane service account, and so a
+  # ResourceQuota can cap load generation without capping the API.
+  namespace: plimsoll-generators
+  image: ghcr.io/ultron13/plimsoll-generator
+  # A cap on load generation. Without one, a test asking for more generators
+  # than the cluster has takes the cluster down with it.
+  quota:
+    cpu: "32"
+    memory: 64Gi
+    pods: "16"
+  # Where generators are allowed to send load. Empty means nowhere outside the
+  # cluster, which is the safe default and a useless one -- set it to the
+  # systems under test. The target policy check (ADR-0007) is the first gate;
+  # this is the second, and it is the one an application bug cannot talk past.
+  egress: []
+
+# Every value here is a reference to a secret that already exists. The chart
+# creates no secrets: a password in values.yaml ends up in Git, in `helm get
+# values`, and in every CI log that renders the chart.
+existingSecret: plimsoll
+
+ingress:
+  enabled: false
+  className: nginx
+  host: plimsoll.example.com
+  tls:
+    enabled: true
+    secretName: plimsoll-tls

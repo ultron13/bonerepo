@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-worker
+  labels:
+    {{- include "plimsoll.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  # Recreate, not RollingUpdate. A rolling update would briefly run two
+  # workers, and two reconcilers acting on the same run provision two sets of
+  # generators and each tears down what the other created.
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app.kubernetes.io/name: plimsoll, app.kubernetes.io/component: worker }
+  template:
+    metadata:
+      labels:
+        {{- include "plimsoll.labels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+    spec:
+      serviceAccountName: {{ .Release.Name }}-worker
+      # The worker finishes the tick it is on and exits; a shorter grace period
+      # than that turns a deploy into an abandoned run.
+      terminationGracePeriodSeconds: 60
+      {{- include "plimsoll.podSecurity" . | nindent 6 }}
+      containers:
+        - name: worker
+          image: "{{ .Values.image.registry }}/plimsoll-worker:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - { name: http, containerPort: 9100 }
+          env:
+            {{- include "plimsoll.env" . | nindent 12 }}
+            - name: PLIMSOLL_GENERATOR_NAMESPACE
+              value: {{ .Values.generators.namespace }}
+          # Liveness only. A worker serves no traffic, so there is nothing to
+          # take it out of; what matters is that the reconciler is still
+          # ticking, which is what this endpoint reports.
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          {{- include "plimsoll.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: {}

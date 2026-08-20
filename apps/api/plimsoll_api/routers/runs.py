@@ -90,6 +90,7 @@ async def start_run(test_id: uuid.UUID, principal: CurrentPrincipal) -> RunRespo
         allocation=allocation,
         target_policy_version=policy.version if policy is not None else 0,
         sla_rules=sla_rules,
+        pool=pool,
     )
 
     async with session_for_org(principal.organization_id) as session:

@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-web
+  labels:
+    {{- include "plimsoll.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.web.replicas }}
+  selector:
+    matchLabels: { app.kubernetes.io/name: plimsoll, app.kubernetes.io/component: web }
+  template:
+    metadata:
+      labels:
+        {{- include "plimsoll.labels" . | nindent 8 }}
+        app.kubernetes.io/component: web
+    spec:
+      {{- include "plimsoll.podSecurity" . | nindent 6 }}
+      containers:
+        - name: web
+          image: "{{ .Values.image.registry }}/plimsoll-web:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - { name: http, containerPort: 3000 }
+          env:
+            - name: NEXT_PUBLIC_API_URL
+              value: {{ if .Values.ingress.enabled }}https://{{ .Values.ingress.host }}{{ else }}http://{{ .Release.Name }}-api{{ end }}
+          readinessProbe:
+            httpGet: { path: /, port: http }
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.web.resources | nindent 12 }}
+          {{- include "plimsoll.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - { name: cache, mountPath: /app/.next/cache }
+      volumes:
+        - name: cache
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-web
+  labels:
+    {{- include "plimsoll.labels" . | nindent 4 }}
+spec:
+  selector: { app.kubernetes.io/name: plimsoll, app.kubernetes.io/component: web }
+  ports:
+    - { name: http, port: 80, targetPort: http }

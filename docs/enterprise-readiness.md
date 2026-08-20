@@ -93,15 +93,43 @@ them, and nothing set them. **Fixed:** a bounded default, pool-configurable
 sizing, and a JVM heap that follows the container rather than a fixed `-Xmx`
 that would be killed by any pool smaller than a gigabyte.
 
-### 6. There is no production runtime
+### 6. There is no production runtime — closed
 
-`infrastructure/kubernetes` and `infrastructure/terraform` are empty. Pools
-accept `runtime: kubernetes`; the probe answers honestly that none is
-implemented. ADR-0003 chose Kubernetes-native generators, and Docker is the
-development runtime.
+**Fixed:** `KubernetesRuntime` behind the existing protocol, and a Helm chart.
+Generators are bare pods with `restartPolicy: Never` — not Jobs, not
+Deployments, because both exist to survive node loss and invariant 6 says a
+generator must not. Verified against a live cluster rather than rendered:
+the chart applies to a real API server, and the runtime creates, finds, sizes
+and removes pods on one. The RBAC boundary is asserted by asking the cluster,
+not by reading the Role.
 
-**Needs:** the `KubernetesRuntime` behind the existing `GeneratorRuntime`
-protocol, and a Helm chart. This is the largest item here.
+Two namespaces, so a `ResourceQuota` can cap load generation without capping
+the API and a `NetworkPolicy` can deny generator egress by default.
+
+Chasing it found the invariant-3 hole below.
+
+### 6b. A run did not pin the pool it was started with — closed
+
+Not in the original list, and the most serious thing found so far.
+`configuration_snapshot` pinned commit SHAs, workload, allocation and SLA
+rules; it did not pin the generator pool. The image, the runtime and the
+sizing were read live at provision time, minutes after preflight had approved
+something else — so editing a pool in that window changed what executed, and
+the docstring promising "nothing read after it starts comes from mutable
+configuration" was false.
+
+The tell was `_pool_settings` reading `snapshot.get("image")`, which
+`build_snapshot` never wrote: the fourth instance of a field that exists with
+nothing wiring it. Switching a pool's runtime mid-run was the worst case —
+teardown would look in the runtime the pool names now, find nothing, and leave
+the generators running against somebody's system.
+
+**Fixed:** the pool is pinned, and every runtime call resolves through what
+the run pinned rather than what the pool says now.
+
+**Still open:** `infrastructure/terraform` is empty, and no full load test has
+been run end to end on a cluster — that needs the generator image on the
+nodes. The launcher is verified; the journey through it is not yet.
 
 ### 7. One organisation, one identity provider — half closed
 
@@ -139,11 +167,13 @@ notes it gates enterprise pilots.
 4. ~~Observability~~ — done
 5. ~~API keys with scopes~~ — done
 6. ~~Generator resource limits~~ — done
-7. Kubernetes runtime and Helm chart — the largest remaining item
+7. ~~Kubernetes runtime and Helm chart~~ — done
 8. ~~User directory: invite, roles, offboarding~~ — done
 9. ~~Backup and restore; `make e2e`; the web interface's missing half~~ — done
 10. ~~Credential key rotation~~ — done
-11. OIDC, and organisations as a product surface
+11. ~~Pin the generator pool in the run snapshot~~ — done
+12. OIDC, and organisations as a product surface
+13. A load test end to end on Kubernetes; Terraform
 
 Each is landed the way the rest of this repository was: a failing test first,
 the change, then the gates.

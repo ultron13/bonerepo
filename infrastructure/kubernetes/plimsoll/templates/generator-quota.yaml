@@ -1,0 +1,48 @@
+# A cap on load generation that is not also a cap on the control plane, which
+# is the reason generators live in their own namespace. Without it a test
+# asking for more generators than the cluster has takes the cluster with it --
+# the control plane killed by the thing it controls.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {{ .Release.Name }}-generators
+  namespace: {{ .Values.generators.namespace }}
+  labels:
+    {{- include "plimsoll.labels" . | nindent 4 }}
+spec:
+  hard:
+    requests.cpu: "{{ .Values.generators.quota.cpu }}"
+    requests.memory: "{{ .Values.generators.quota.memory }}"
+    pods: "{{ .Values.generators.quota.pods }}"
+---
+# Generators talk to the control plane and to the system under test. They have
+# no reason to talk to each other, and no reason to reach the cluster's own
+# services -- so egress is opened deliberately rather than by default.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-generators
+  namespace: {{ .Values.generators.namespace }}
+  labels:
+    {{- include "plimsoll.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: { plimsoll.component: generator }
+  policyTypes: ["Ingress", "Egress"]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ .Release.Namespace }} }
+    - ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+{{- range .Values.generators.egress }}
+    - to:
+        - ipBlock:
+            cidr: {{ .cidr }}
+            {{- with .except }}
+            except:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+{{- end }}

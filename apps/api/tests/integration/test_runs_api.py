@@ -1,11 +1,18 @@
 """Starting a run: what the API promises before any container exists."""
 
+import os
 import uuid
 
 import httpx
 import pytest
+import sqlalchemy as sa
 
 from plimsoll_api.seed import DEMO_TEST_ID
+
+OWNER_URL = os.environ.get(
+    "PLIMSOLL_TEST_MIGRATION_URL",
+    "postgresql+psycopg://plimsoll_owner:plimsoll_owner_dev@localhost:5432/plimsoll",
+)
 
 pytestmark = pytest.mark.integration
 
@@ -145,3 +152,57 @@ def test_recent_runs_are_paginated_like_everything_else(admin_client: httpx.Clie
 
 def test_a_viewer_may_read_recent_runs(viewer_client: httpx.Client) -> None:
     assert viewer_client.get("/api/v1/runs?limit=5").status_code == 200
+
+
+def test_a_run_pins_the_pool_it_was_started_with(admin_client: httpx.Client) -> None:
+    """Invariant 3, for the half of it that was missing.
+
+    Commit SHAs, workload, allocation and SLA rules were pinned. The generator
+    pool was not: the image, the runtime and the sizing were read live at
+    provision time, minutes after the run was accepted. Editing a pool in that
+    window changed what executed -- past the preflight that had already
+    approved something else -- and switching its runtime stranded the
+    generators, because teardown would go looking in the wrong place.
+    """
+    # The pool this test actually uses, not whichever one is listed first.
+    configuration = admin_client.get(f"/api/v1/tests/{DEMO_TEST_ID}").json()["configuration"]
+    pool_id = uuid.UUID(configuration["generatorPoolId"])
+    before = admin_client.get(f"/api/v1/generator-pools/{pool_id}").json()
+
+    run = admin_client.post(f"/api/v1/tests/{DEMO_TEST_ID}/runs").json()
+    assert "id" in run, run
+
+    try:
+        # The edit a run must be immune to, in the window where it can happen.
+        assert (
+            admin_client.patch(
+                f"/api/v1/generator-pools/{pool_id}",
+                json={"config": {**before["config"], "image": "example.invalid/moved:9.9.9"}},
+            ).status_code
+            == 200
+        )
+
+        engine = sa.create_engine(OWNER_URL)
+        with engine.begin() as connection:
+            connection.execute(
+                sa.text("SELECT set_config('app.current_org_id', :org, true)"),
+                {
+                    "org": str(
+                        uuid.UUID(admin_client.get("/api/v1/auth/me").json()["organizationId"])
+                    )
+                },
+            )
+            snapshot = connection.execute(
+                sa.text("SELECT configuration_snapshot FROM test_runs WHERE id = :id"),
+                {"id": uuid.UUID(run["id"])},
+            ).scalar_one()
+        engine.dispose()
+
+        pinned = snapshot.get("pool")
+        assert pinned is not None, "the run records the pool it was started with"
+        assert pinned["image"] == before["config"]["image"]
+        assert pinned["runtime"] == before["runtime"]
+        assert pinned["id"] == str(pool_id)
+    finally:
+        admin_client.patch(f"/api/v1/generator-pools/{pool_id}", json={"config": before["config"]})
+        admin_client.post(f"/api/v1/runs/{run['id']}/cancel")

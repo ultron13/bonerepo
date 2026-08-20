@@ -59,6 +59,7 @@ from plimsoll_worker.metrics import merge_batch, write
 from plimsoll_worker.reconciler import Decision, GeneratorRow, RunView, decide, is_silent
 from plimsoll_worker.runtime.base import GeneratorHandle, GeneratorSpec
 from plimsoll_worker.runtime.docker import DockerRuntime
+from plimsoll_worker.runtime.kubernetes import KubernetesRuntime
 from plimsoll_worker.serving import serve
 
 TICK_SECONDS = 2
@@ -101,10 +102,46 @@ LIVE_RUN_STATUSES: list[str] = [
 ]
 
 
+# A pool declares which one it uses. Both create the same generator image
+# from the same spec; only the launcher differs, which is what keeps `make dev`
+# honest about production.
+RUNTIMES: dict[str, Callable[[], Any]] = {
+    "docker": DockerRuntime,
+    "kubernetes": KubernetesRuntime,
+}
+
+
 class Orchestrator:
     def __init__(self) -> None:
-        self._runtime = DockerRuntime()
+        self._runtimes: dict[str, Any] = {}
         self._bus = get_bus()
+
+    def runtime(self, name: str) -> Any:
+        """Built once each and kept: a client carries a connection pool, and
+        one per run would leak sockets for as long as the worker lives."""
+        if name not in RUNTIMES:
+            raise RuntimeError(f"No runtime is implemented for {name}.")
+        if name not in self._runtimes:
+            self._runtimes[name] = RUNTIMES[name]()
+        return self._runtimes[name]
+
+    async def _runtime_for(self, run: sa.Row[Any], org_id: uuid.UUID) -> Any:
+        """The runtime the run pinned, not the one its pool names now.
+
+        A pool switched from docker to kubernetes mid-run would otherwise
+        strand the generators: teardown would look in the new runtime, find
+        nothing, and leave the old ones running against somebody's system.
+        """
+        pinned = (run.configuration_snapshot or {}).get("pool") or {}
+        if pinned.get("runtime"):
+            return self.runtime(str(pinned["runtime"]))
+        # A run created before the pool was pinned. The live pool is the only
+        # thing left to ask, which is exactly the weakness being removed.
+        async with session_for_org(org_id) as session:
+            pool = await pools_repo.get(
+                session, uuid.UUID(run.configuration_snapshot["workload"]["generatorPoolId"])
+            )
+        return self.runtime(pool.runtime if pool is not None else "docker")
 
     async def reconcile(self, run_id: uuid.UUID, org_id: uuid.UUID) -> bool:
         """Returns whether the run is finished with. One tick, one decision."""
@@ -148,7 +185,7 @@ class Orchestrator:
             # A run can be ended without the worker's help -- a cancel over
             # HTTP does exactly that. Whoever ends it, the containers are this
             # process's to remove, so the last tick reaps before letting go.
-            await self._reap(run.id, org_id)
+            await self._reap(run, org_id)
             return True
         if decision is Decision.PROVISION:
             await self._provision(run, org_id, view)
@@ -188,7 +225,7 @@ class Orchestrator:
         # containers and died before recording them. Adopting them makes the
         # rows describe what exists, which is what lets them be torn down and
         # what stops this attempt colliding with their deterministic names.
-        adopted = await self._adopt_orphans(run.id, org_id, view)
+        adopted = await self._adopt_orphans(run, org_id, view)
 
         image, resources = await self._pool_settings(run, org_id)
         ttl = view.duration_seconds + GRACE_SECONDS
@@ -232,7 +269,7 @@ class Orchestrator:
         ]
 
         try:
-            handles = await self._runtime.provision(specs)
+            handles = await (await self._runtime_for(run, org_id)).provision(specs)
         except Exception:
             # provision is all-or-nothing, so there is nothing to reap here --
             # only a run to fail, loudly rather than by stalling in ALLOCATING.
@@ -246,7 +283,7 @@ class Orchestrator:
                 session, run.id, expected=[RunStatus.ALLOCATING], to=RunStatus.STARTING
             )
 
-    async def _adopt_orphans(self, run_id: uuid.UUID, org_id: uuid.UUID, view: RunView) -> set[int]:
+    async def _adopt_orphans(self, run: sa.Row[Any], org_id: uuid.UUID, view: RunView) -> set[int]:
         """Record containers this run already has that no row describes.
 
         A worker that died between creating a container and writing its
@@ -259,7 +296,8 @@ class Orchestrator:
         Returns the ordinals that were adopted.
         """
         known = {row.ordinal for row in view.generators if row.external_ref is not None}
-        existing = await self._runtime.find_by_run(run_id)
+        run_id = run.id
+        existing = await (await self._runtime_for(run, org_id)).find_by_run(run_id)
         orphans = [handle for handle in existing if handle.ordinal not in known]
         if not orphans:
             return set()
@@ -304,17 +342,29 @@ class Orchestrator:
         the two numbers have to move together.
         """
         snapshot = run.configuration_snapshot
+        pinned = snapshot.get("pool") or {}
+        if pinned.get("image"):
+            resources = {
+                key: pinned[key]
+                for key in ("memoryLimit", "cpuLimit")
+                if pinned.get(key) is not None
+            }
+            return str(pinned["image"]), resources
+
+        # A run created before the pool was pinned. Reading the live pool is
+        # what this replaced -- a pool edited after the run was accepted used
+        # to change what executed -- so it stays only for runs already queued
+        # when this landed.
         async with session_for_org(org_id) as session:
             pool = await pools_repo.get(session, uuid.UUID(snapshot["workload"]["generatorPoolId"]))
         if pool is None:
             raise RuntimeError(f"Run {run.id} names a generator pool that no longer exists.")
 
         config = dict(pool.config)
-        image = str(snapshot.get("image") or config["image"])
         resources = {
             key: config[key] for key in ("memoryLimit", "cpuLimit") if config.get(key) is not None
         }
-        return image, resources
+        return str(config["image"]), resources
 
     async def _command(
         self, run_id: uuid.UUID, org_id: uuid.UUID, status: RunStatus, command: Command
@@ -343,10 +393,11 @@ class Orchestrator:
                         session, run_id, generator.ordinal, GeneratorStatus.LOST
                     )
 
-    async def check_image(self, image: str) -> tuple[bool, str]:
-        return await self._runtime.check(image)
+    async def check_image(self, runtime: str, image: str) -> tuple[bool, str]:
+        ok, detail = await self.runtime(runtime).check(image)
+        return bool(ok), str(detail)
 
-    async def _reap(self, run_id: uuid.UUID, org_id: uuid.UUID) -> list[GeneratorHandle]:
+    async def _reap(self, run: sa.Row[Any], org_id: uuid.UUID) -> list[GeneratorHandle]:
         """Remove every container the run created.
 
         Idempotent, which is what lets it run on every terminal path without
@@ -354,13 +405,13 @@ class Orchestrator:
         already gone is the outcome this wanted.
         """
         async with session_for_org(org_id) as session:
-            rows = await repo.generators_for(session, run_id)
+            rows = await repo.generators_for(session, run.id)
         handles = [
             GeneratorHandle(ordinal=row.ordinal, external_ref=row.external_ref)
             for row in rows
             if row.external_ref
         ]
-        await self._runtime.teardown(handles)
+        await (await self._runtime_for(run, org_id)).teardown(handles)
         return handles
 
     async def _evaluate_sla(self, run: sa.Row[Any], org_id: uuid.UUID) -> None:
@@ -401,7 +452,7 @@ class Orchestrator:
             )
 
     async def _finish(self, run: sa.Row[Any], org_id: uuid.UUID, status: RunStatus) -> None:
-        handles = await self._reap(run.id, org_id)
+        handles = await self._reap(run, org_id)
 
         async with session_for_org(org_id) as session:
             await repo.transition(
@@ -490,10 +541,7 @@ async def _serve_probes(
         for delivery in deliveries:
             runtime = delivery.payload["runtime"]
             try:
-                if runtime != "docker":
-                    ok, detail = False, f"No runtime is implemented for {runtime}."
-                else:
-                    ok, detail = await orchestrator.check_image(delivery.payload["image"])
+                ok, detail = await orchestrator.check_image(runtime, delivery.payload["image"])
             except Exception as exc:
                 logger.exception("probing a %s pool failed", runtime)
                 ok, detail = False, f"The probe itself failed: {exc}"

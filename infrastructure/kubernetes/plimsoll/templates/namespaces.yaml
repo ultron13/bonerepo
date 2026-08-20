@@ -1,0 +1,8 @@
+{{- if ne .Values.generators.namespace .Release.Namespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.generators.namespace }}
+  labels:
+    {{- include "plimsoll.labels" . | nindent 4 }}
+{{- end }}

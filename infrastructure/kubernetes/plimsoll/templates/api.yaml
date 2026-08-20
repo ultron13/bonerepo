@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-api
+  labels:
+    {{- include "plimsoll.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels: { app.kubernetes.io/name: plimsoll, app.kubernetes.io/component: api }
+  template:
+    metadata:
+      labels:
+        {{- include "plimsoll.labels" . | nindent 8 }}
+        app.kubernetes.io/component: api
+    spec:
+      {{- include "plimsoll.podSecurity" . | nindent 6 }}
+      containers:
+        - name: api
+          image: "{{ .Values.image.registry }}/plimsoll-api:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - { name: http, containerPort: 8000 }
+          env:
+            {{- include "plimsoll.env" . | nindent 12 }}
+          # Distinct probes on purpose. Readiness takes the pod out of the
+          # service while it cannot serve; liveness restarts it. Using the
+          # same check for both turns a slow dependency into a restart loop,
+          # which is how a database blip becomes an outage.
+          readinessProbe:
+            httpGet: { path: /api/v1/health/ready, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /api/v1/health/live, port: http }
+            periodSeconds: 15
+            failureThreshold: 4
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+          {{- include "plimsoll.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      # The root filesystem is read-only, and the process still needs
+      # somewhere to write.
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-api
+  labels:
+    {{- include "plimsoll.labels" . | nindent 4 }}
+spec:
+  selector: { app.kubernetes.io/name: plimsoll, app.kubernetes.io/component: api }
+  ports:
+    - { name: http, port: 80, targetPort: http }
+---
+# Two replicas mean nothing if a node drain takes both at once.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}-api
+  labels:
+    {{- include "plimsoll.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: plimsoll, app.kubernetes.io/component: api }
