@@ -114,3 +114,31 @@ def test_creating_a_key_is_audited(admin_client: httpx.Client) -> None:
     created = _create(admin_client)
     entries = admin_client.get("/api/v1/audit-logs?action=api_key.created&limit=20").json()
     assert any(item["entityId"] == created["id"] for item in entries["items"])
+
+
+def test_what_a_key_does_is_attributable_to_that_key(admin_client: httpx.Client) -> None:
+    """Automation is the case that most needs a name against it.
+
+    Nobody remembers what a pipeline did last March. An entry that records the
+    action and no actor says something happened and refuses to say who, which
+    is the one question an audit trail exists to answer -- and it is worse for
+    a key than for a person, because there is no human memory to fall back on.
+    """
+    created = _create(admin_client, scopes=["project.read", "project.write"])
+    key_id = str(created["id"])
+
+    with _as_key(str(created["secret"])) as client:
+        project = client.post(
+            "/api/v1/projects",
+            json={"name": "By a key", "projectKey": f"K{uuid.uuid4().hex[:8].upper()}"},
+        ).json()
+
+    entries = admin_client.get(f"/api/v1/audit-logs?entityId={project['id']}&limit=10").json()[
+        "items"
+    ]
+    assert entries, "the key's action left no trace"
+
+    entry = entries[0]
+    assert entry["apiKeyId"] == key_id, entry
+    # And no person is credited for something no person did.
+    assert entry["userId"] is None, entry

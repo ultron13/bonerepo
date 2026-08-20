@@ -14,6 +14,7 @@ async def insert(
     *,
     org_id: uuid.UUID,
     user_id: uuid.UUID | None,
+    api_key_id: uuid.UUID | None,
     action: str,
     entity_type: str | None,
     entity_id: uuid.UUID | None,
@@ -22,14 +23,16 @@ async def insert(
     await session.execute(
         sa.text(
             "INSERT INTO audit_logs "
-            "(id, organization_id, user_id, action, entity_type, entity_id, metadata) "
-            "VALUES (:id, :org, :user, :action, :entity_type, :entity_id, "
+            "(id, organization_id, user_id, api_key_id, action, entity_type, entity_id, "
+            " metadata) "
+            "VALUES (:id, :org, :user, :api_key, :action, :entity_type, :entity_id, "
             "CAST(:metadata AS jsonb))"
         ),
         {
             "id": uuid.uuid4(),
             "org": org_id,
             "user": user_id,
+            "api_key": api_key_id,
             "action": action,
             "entity_type": entity_type,
             "entity_id": entity_id,

@@ -27,7 +27,11 @@ async def record(
     await repo.insert(
         session,
         org_id=principal.organization_id,
+        # Exactly one of these is set. A person acted, or a key did, and an
+        # entry that names neither answers the one question the trail exists
+        # for with silence.
         user_id=principal.user_id,
+        api_key_id=principal.api_key_id,
         action=action,
         entity_type=entity_type,
         entity_id=entity_id,
