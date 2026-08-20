@@ -13,8 +13,39 @@ rather we did not.
 
 ## Supported versions
 
-Pre-alpha: only `main` is supported. A support policy for released versions
-arrives with v0.1.
+Plimsoll uses semantic versioning. A release series is `MAJOR.MINOR`; patches
+within a series are backward compatible.
+
+| Series | Status | Security fixes until |
+| --- | --- | --- |
+| `main` | Pre-alpha, unreleased | While it is the development branch |
+| Current minor | Supported | Superseded by the next minor, plus 90 days |
+| Previous minor | Maintenance | 90 days after the next minor ships |
+| Older | Unsupported | — |
+
+In practice that means **two minor series are supported at any time**, and an
+operator has at least 90 days to move between them.
+
+Fixes land on the current minor first and are backported to the one in
+maintenance as a patch release. A fix is never shipped only inside a feature
+release: an operator must never have to take new behaviour to get a security
+fix.
+
+Until v1.0 a minor series may ship a breaking change, and the release notes say
+so explicitly. From v1.0, breaking changes wait for a major.
+
+### What counts as a vulnerability here
+
+Alongside the ordinary categories, and because of what this software does:
+
+- Anything that lets a run reach a target the [target policy](docs/architecture/05-security.md)
+  does not permit, including a bypass through DNS, redirects, or a variable.
+- Anything that puts a durable credential inside a generator container, which
+  runs a user-supplied plan.
+- Anything that lets one organisation read or write another's runs, results, or
+  artifacts.
+- A default that is unsafe without configuration. There is no permit-all state,
+  and a deployment that has not been configured refuses rather than allows.
 
 ## Why this project needs a security policy more than most
 

@@ -317,26 +317,48 @@ something to silently resolve.
 /ws/runs/{runId}
 ```
 
+A subscriber receives the run's status on connect, each merged metric window
+as it lands, and a further status frame when the run changes state:
+
 ```json
 {
   "type": "metric",
-  "runId": "run-2026-000123",
-  "timestamp": "2026-08-10T10:00:00Z",
-  "metric": {
-    "activeUsers": 1250,
-    "throughput": 840,
-    "p95": 720,
-    "errorRate": 0.4
-  }
+  "runId": "9167ea80-007a-4608-b0be-a692bccfcd3e",
+  "transaction": "Checkout",
+  "windowStart": "2026-08-20T12:21:30+00:00",
+  "count": "18",
+  "errorCount": "0",
+  "p50": "630",
+  "p95": "864",
+  "p99": "901"
 }
 ```
 
-Events: `run.started`, `run.running`, `metric`, `transaction.metric`,
-`generator.status`, `sla.violation`, `run.warning`, `run.failed`,
-`run.completed`. Terminal events invalidate the matching TanStack Query caches
-so the UI converges without polling.
+```json
+{ "type": "run.status", "runId": "9167ea80-…", "status": "RUNNING" }
+```
 
-Authentication happens on connect; subscriptions are authorised per run.
+The percentiles are derived at push time from that window's own merged sketch.
+Nothing on this socket carries a percentile computed somewhere else.
+
+**A window may be announced more than once, and each announcement carries the
+running total for that window rather than an increment.** Samples belonging to a
+window can be read after it was drained, so the worker merges and re-announces.
+A subscriber therefore keys on `(transaction, windowStart)` and takes the latest
+value; one that added increments would double-count, and one told increments
+would disagree with `GET /runs/{id}/metrics`.
+
+Later slices add `transaction.metric`, `generator.status`, `sla.violation`, and
+`run.warning`. Terminal events invalidate the matching TanStack Query caches so
+the UI converges without polling.
+
+Authentication happens on connect, with an ordinary access token and
+`TEST_READ` — this is a user's socket, not an agent's, and the two token
+families never mix. A browser cannot set a header on a WebSocket, so the token
+may arrive as a `token` query parameter; it is the same token, checked the same
+way. An unauthenticated socket, or one naming a run the caller cannot see, is
+refused at the handshake rather than opened and closed, so the refusal tells an
+outsider nothing about whether the run exists.
 
 ## CI integration
 

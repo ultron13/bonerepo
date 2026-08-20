@@ -198,6 +198,33 @@ never restarted and never quietly ignored: the run is failed, or marked
 `degraded`, because a result produced with less load than planned must not pass
 as a full one.
 
+### Read what it measured
+
+Percentiles are computed once, from HDR sketches merged across every generator
+— never averaged, which is the mistake this project exists to avoid:
+
+```bash
+curl -s -H "$AUTH" "http://localhost:8000/api/v1/runs/$RUN/metrics" | jq '.transactions[]'
+curl -s -H "$AUTH" "http://localhost:8000/api/v1/runs/$RUN/errors" | jq '{total, items}'
+```
+
+Failures are grouped by what they are rather than repeated: the message has its
+identifiers and numbers normalised away, so one fault seen a thousand times is
+one row with a count and one verbatim example.
+
+If the test carried SLA rules, the finished run also has a verdict — `slaResult`
+for the run, and `summary.sla.rules` for each rule with the value it actually
+measured. A rule whose transaction produced no data reports `SKIPPED`, never a
+pass.
+
+To watch it happen instead of reading it afterwards, subscribe while the run is
+in flight — the socket carries each merged window as it closes:
+
+```bash
+# websocat, or any WebSocket client
+websocat "ws://localhost:8000/ws/runs/$RUN?token=$TOKEN"
+```
+
 ### Take the results away
 
 A finished run leaves the raw JMeter results and the engine's log in object
