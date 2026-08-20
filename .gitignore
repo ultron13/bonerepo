@@ -16,3 +16,6 @@ dist/
 # Screenshots from browser-driven verification.
 run-detail.png
 .playwright-mcp/
+
+# Backups are taken to a path the operator chooses, never into the tree.
+backups/

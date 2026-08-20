@@ -1,4 +1,4 @@
-.PHONY: test lint typecheck format dev dev-down test-int contracts
+.PHONY: test lint typecheck format dev dev-down test-int contracts backup restore-drill
 
 UV := uv run
 COMPOSE := docker compose -f infrastructure/docker/docker-compose.yml
@@ -35,6 +35,15 @@ dev-down:
 
 test-int:
 	$(UV) pytest apps/api/tests/integration apps/worker/tests/integration -v -m integration
+
+backup:
+	./scripts/backup.sh $(DEST)
+
+# An untested backup is not a backup. This restores the most recent one into a
+# scratch database and compares it against the live one, so the procedure is
+# exercised on a schedule rather than first attempted during an incident.
+restore-drill:
+	./scripts/restore-drill.sh
 
 # Generation runs in a container, so the Docker-and-make-only promise holds.
 # Both containers run as the invoking user, so the output is not root-owned.
