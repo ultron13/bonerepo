@@ -146,3 +146,32 @@ export interface StatusEvent {
 }
 
 export type LiveEvent = MetricEvent | StatusEvent;
+
+export interface ScriptRepo {
+  id: string;
+  name: string;
+  repoUrl: string;
+  planPath: string;
+  defaultRef: string;
+  status: string;
+}
+
+export interface GeneratorPool {
+  id: string;
+  name: string;
+  runtime: string;
+  maxGenerators: number;
+  maxVusPerGenerator: number;
+  capacity: number;
+}
+
+export interface VerifyFinding {
+  code: string;
+  severity: string;
+  message: string;
+}
+
+export interface VerifyReport {
+  ok: boolean;
+  findings: VerifyFinding[];
+}

@@ -14,8 +14,27 @@ export class ApiError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    readonly details?: Record<string, unknown>,
   ) {
     super(message);
+  }
+
+  /**
+   * The failing checks, when the refusal carried any.
+   *
+   * Preflight reports every failure at once rather than the first, and that
+   * list is the whole reason the endpoint is shaped the way it is. Showing
+   * only the summary would send someone round the loop once per problem.
+   */
+  checks(): string[] {
+    const checks = this.details?.checks;
+    if (!Array.isArray(checks)) return [];
+    return checks
+      .filter((check) => (check as { status?: string }).status === "FAIL")
+      .map((check) => {
+        const { code, message } = check as { code?: string; message?: string };
+        return message ? `${code}: ${message}` : String(code);
+      });
   }
 }
 
@@ -61,14 +80,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     // what makes a refusal actionable rather than a status code.
     let code = "UNKNOWN";
     let message = response.statusText;
+    let details: Record<string, unknown> | undefined;
     try {
-      const body = (await response.json()) as { code?: string; message?: string };
-      code = body.code ?? code;
-      message = body.message ?? message;
+      const body = (await response.json()) as {
+        error?: { code?: string; message?: string; details?: Record<string, unknown> };
+      };
+      const envelope = body.error ?? {};
+      code = envelope.code ?? code;
+      message = envelope.message ?? message;
+      details = envelope.details;
     } catch {
       // A response with no envelope: the status is all there is to report.
     }
-    throw new ApiError(response.status, code, message);
+    throw new ApiError(response.status, code, message, details);
   }
 
   if (response.status === 204) return undefined as T;

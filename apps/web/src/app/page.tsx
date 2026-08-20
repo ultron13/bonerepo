@@ -135,7 +135,12 @@ export default function Home() {
 
   return (
     <main className="space-y-6">
-      <h1 className="text-xl font-semibold text-slate-100">Runs</h1>
+      <div className="flex items-baseline justify-between">
+        <h1 className="text-xl font-semibold text-slate-100">Runs</h1>
+        <Link className="text-sm text-accent hover:underline" href="/projects">
+          Projects →
+        </Link>
+      </div>
       <Card>
         <Runs />
       </Card>
