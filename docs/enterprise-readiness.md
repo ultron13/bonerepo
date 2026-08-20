@@ -37,24 +37,29 @@ weekly as well as on change.
 It found three high-severity vulnerabilities in the frontend within minutes of
 existing. That is the argument for it.
 
-### 2. The audit log cannot be read
+### 2. The audit log cannot be read — closed
 
-Rows are written on every mutation. There is no repository read function and no
-endpoint, so the log exists as a table nobody can query. An audit log that
-cannot be produced on request does not satisfy the requirement it was built for.
+**Fixed:** `GET /api/v1/audit-logs`, keyset paginated newest-first and
+filterable by action, entity, and user. It takes `ADMIN_SYSTEM` rather than a
+read permission, because the trail names people. Two indexes match how it is
+queried; an `EXPLAIN` confirms an index scan with no sort.
 
-**Needs:** a paginated, filterable read API scoped by organisation, with the
-same RLS guarantees as everything else.
+### 3. A run did not survive the worker provisioning it — closed
 
-### 3. The worker does not shut down
+The stated gap was that the worker ignored `SIGTERM`. That was true and is
+fixed, but chasing it found three worse faults behind it, all on the path a
+Kubernetes rollout exercises on every deploy:
 
-No `SIGTERM` handling. Kubernetes and `docker stop` both signal and then kill.
-The reconciler converges after a restart, so nothing is corrupted — but a worker
-killed mid-provision leaves containers whose rows were never written, and those
-are the ones nothing reaps.
+* Containers created but not yet recorded were invisible: never reaped, and
+  colliding by name with the next attempt.
+* An `ALLOCATING` run was never re-provisioned, so it waited for ever while its
+  containers ran unattended.
+* A generator that survived into a recovered run sat at `READY`-or-beyond and
+  the run refused to start, because the check demanded exactly `READY`.
 
-**Needs:** signal handling that stops accepting work, finishes the tick in
-flight, and exits.
+**Fixed:** the runtime can be asked what a run has, orphans are adopted before
+anything is created, provisioning is re-enterable, and ready-or-beyond counts as
+ready. `SIGTERM` finishes the tick in flight and exits clean.
 
 ### 4. Authentication has no throttle
 
@@ -104,8 +109,8 @@ gates enterprise pilots.
 
 ## Order of work
 
-1. Audit log read API — smallest gap between "recorded" and "auditable"
-2. Worker graceful shutdown — correctness under ordinary operations
+1. ~~Audit log read API~~ — done
+2. ~~Worker recovery and graceful shutdown~~ — done
 3. Auth rate limiting — the cheapest real attack to close
 4. Observability — metrics and the alerts worth having
 5. Kubernetes runtime and Helm chart
