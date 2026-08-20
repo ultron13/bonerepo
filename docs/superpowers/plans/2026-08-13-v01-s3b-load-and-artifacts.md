@@ -280,7 +280,7 @@ git commit -s -m "feat(executor): the executor seam, with JMeter behind it"
 **Interfaces:**
 - Produces: `bundle_key(run_id)`, `artifact_key(run_id, ordinal, name)`, `ensure_bucket()`, `presign_put(key, seconds)`, `presign_get(key, seconds)`, `put_bytes(key, payload)`, `list_prefix(prefix)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `apps/api/tests/integration/test_storage.py`:
 
@@ -352,12 +352,12 @@ def test_a_name_cannot_escape_its_prefix() -> None:
         storage.artifact_key(uuid.uuid4(), 0, "../../etc/passwd")
 ```
 
-- [ ] **Step 2: Run it to make sure it fails**
+- [x] **Step 2: Run it to make sure it fails**
 
 Run: `uv run pytest apps/api/tests/integration/test_storage.py -v -m integration`
 Expected: FAIL — `ModuleNotFoundError: plimsoll_api.storage`.
 
-- [ ] **Step 3: Configure the bucket and credentials**
+- [x] **Step 3: Configure the bucket and credentials**
 
 Add to `apps/api/plimsoll_api/config.py`:
 
@@ -382,7 +382,7 @@ sets all three.
 
 Add `"boto3>=1.34"` and `"types-boto3>=1.0"` (the latter in the root dev group) to `apps/api/pyproject.toml`, then `uv sync`.
 
-- [ ] **Step 4: Write the storage module**
+- [x] **Step 4: Write the storage module**
 
 `apps/api/plimsoll_api/storage.py`:
 
@@ -524,7 +524,7 @@ Put `_reachable` in `apps/api/tests/integration/conftest.py` and use it in every
 test that fetches a presigned URL. Signing stays on one endpoint, which is the
 property that matters.
 
-- [ ] **Step 5: Create the bucket at startup**
+- [x] **Step 5: Create the bucket at startup**
 
 In `apps/worker/plimsoll_worker/__main__.py`, call `ensure_bucket()` once before the loop:
 
@@ -536,12 +536,12 @@ async def main() -> None:
 
 so `make dev` needs no extra step and a deployment needs no manual one.
 
-- [ ] **Step 6: Run the tests and make sure they pass**
+- [x] **Step 6: Run the tests and make sure they pass**
 
 Run: `make dev && uv run pytest apps/api/tests/integration/test_storage.py -v -m integration`
 Expected: PASS — six tests. Wrap the URLs in `_reachable` where the tests call `httpx`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 make lint && make typecheck && make test
