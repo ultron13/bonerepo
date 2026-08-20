@@ -1,0 +1,75 @@
+# Supply chain and secrets, on a schedule as well as on change: a dependency
+# that was clean when it was added can stop being clean without anyone touching
+# the repository.
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependencies:
+    name: Known vulnerabilities
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.11.29"
+          enable-cache: true
+
+      - name: Audit Python dependencies
+        run: |
+          uv sync --locked
+          # --skip-editable: the workspace's own packages are not on PyPI, and
+          # auditing them against it reports a lookup failure rather than a
+          # finding. Their dependencies are still audited.
+          uv run --with pip-audit pip-audit --skip-editable --progress-spinner off
+
+      - name: Audit web dependencies
+        working-directory: apps/web
+        run: |
+          npm ci --no-audit --no-fund
+          npm audit --audit-level=high
+
+  images:
+    name: Container images
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the images CI would ship
+        run: |
+          docker build -f infrastructure/docker/api.Dockerfile -t plimsoll-api:ci .
+          docker build -f infrastructure/docker/generator.Dockerfile -t plimsoll-generator:ci .
+
+      - name: Scan for known vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: plimsoll-api:ci
+          format: table
+          # A build that fails on a HIGH nobody can fix teaches people to ignore
+          # it. Failing on what is fixable keeps the signal worth reading.
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Scan the generator image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: plimsoll-generator:ci
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"

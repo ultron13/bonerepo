@@ -1,0 +1,92 @@
+# What has to hold before anything reaches main.
+#
+# The jobs run the same `make` targets a developer runs, deliberately: a gate
+# that only exists in CI is a gate developers cannot reproduce, and one that
+# only exists locally is a gate nobody enforces.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push supersedes an older one on the same branch. main is exempt:
+# every commit that lands there gets a full verdict of its own.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Lint, types, unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.11.29"
+          enable-cache: true
+
+      - name: Install Python dependencies
+        run: uv sync --locked
+
+      - name: Install web dependencies
+        working-directory: apps/web
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+          cd apps/web && npm run lint
+
+      - name: Typecheck
+        run: |
+          uv run mypy apps packages images
+          cd apps/web && npm run typecheck
+
+      - name: Unit tests
+        run: |
+          uv run pytest apps/api/tests/unit apps/worker/tests/unit apps/agent/tests/unit \
+            packages/executor-sdk/tests packages/contracts/python/tests -v
+
+  integration:
+    name: Integration
+    runs-on: ubuntu-latest
+    # Brings up the whole stack, runs real containers, and generates real load.
+    # Slow by nature; the alternative is not knowing whether the thing works.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.11.29"
+          enable-cache: true
+
+      - name: Install Python dependencies
+        run: uv sync --locked
+
+      - name: Bring up the stack
+        run: make dev
+
+      - name: Integration tests
+        run: make test-int
+
+      - name: Generated types are committed and current
+        run: |
+          make contracts
+          git diff --exit-code packages/contracts/typescript/src/generated.ts
+
+      - name: Stack logs
+        if: failure()
+        run: |
+          docker compose -f infrastructure/docker/docker-compose.yml logs --tail 200 api worker
