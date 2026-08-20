@@ -58,7 +58,7 @@ packages/executor-sdk/tests/test_jmeter.py
 **Interfaces:**
 - Produces: `ExecutionContext`, `Outcome`, `Executor` protocol, `JMeterExecutor` with `command`, `artifacts`, `interpret`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `packages/executor-sdk/tests/test_jmeter.py`:
 
@@ -135,7 +135,7 @@ def test_a_non_zero_exit_is_a_failed_generator() -> None:
     assert JMeterExecutor().interpret(255) is Outcome.FAILED
 ```
 
-- [ ] **Step 2: Create the package and run the test**
+- [x] **Step 2: Create the package and run the test**
 
 `packages/executor-sdk/pyproject.toml`:
 
@@ -161,7 +161,7 @@ Add `"packages/executor-sdk"` to the workspace members, `plimsoll-executor-sdk =
 Run: `uv sync && uv run pytest packages/executor-sdk/tests -v`
 Expected: FAIL — `ModuleNotFoundError: plimsoll_executor.base`.
 
-- [ ] **Step 3: Write the seam and the executor**
+- [x] **Step 3: Write the seam and the executor**
 
 `packages/executor-sdk/plimsoll_executor/base.py`:
 
@@ -255,12 +255,12 @@ class JMeterExecutor(Executor):
         return Outcome.COMPLETED if exit_code == 0 else Outcome.FAILED
 ```
 
-- [ ] **Step 4: Run the tests and make sure they pass**
+- [x] **Step 4: Run the tests and make sure they pass**
 
 Run: `uv run pytest packages/executor-sdk/tests -v`
 Expected: PASS — eight tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 make lint && make typecheck && make test
