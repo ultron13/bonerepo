@@ -29,6 +29,10 @@ class Channel:
     async def send(self, model: Register | StateReport | Heartbeat) -> None:
         await self._socket.send(model.model_dump_json())
 
+    async def send_raw(self, payload: dict[str, Any]) -> None:
+        """For frames the agent builds by hand rather than from a model."""
+        await self._socket.send(json.dumps(payload))
+
     async def report(self, state: AgentState, reason: str | None = None) -> None:
         await self.send(StateReport(state=state, reason=reason))
 

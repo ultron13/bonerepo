@@ -12,12 +12,16 @@ import uuid
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from plimsoll_api import storage
 from plimsoll_api.db.session import session_for_org
 from plimsoll_api.messaging import get_bus, run_channel
 from plimsoll_api.repositories import runs as repo
 from plimsoll_api.security.tokens import AgentClaims, TokenError, decode_agent_token
+from plimsoll_api.services import credentials
 from plimsoll_contracts.agent import (
     Accepted,
+    ArtifactUrl,
+    ArtifactUrlRequest,
     Command,
     CommandFrame,
     HeartbeatAck,
@@ -93,7 +97,13 @@ async def agent_channel(websocket: WebSocket, run_id: uuid.UUID) -> None:
                     await websocket.close(code=4404)
                     return
                 mine = next(g for g in generators if g.ordinal == claims.ordinal)
-                workload = run.configuration_snapshot["workload"]
+                snapshot = run.configuration_snapshot
+                workload = snapshot["workload"]
+                plan = snapshot["plans"][0]
+                # Decrypted here and held only as long as the frame takes to
+                # send. The agent keeps them in memory and never writes them.
+                async with session_for_org(claims.organization_id) as session:
+                    resolved = await credentials.variables(session)
                 await websocket.send_text(
                     Registered(
                         desired_state=run.status,
@@ -101,6 +111,16 @@ async def agent_channel(websocket: WebSocket, run_id: uuid.UUID) -> None:
                         assigned_users=mine.assigned_users,
                         duration_seconds=workload["durationSeconds"],
                         ramp_up_seconds=workload["rampUpSeconds"],
+                        plan_path=plan["planPath"],
+                        # Signed per registration rather than stored: a
+                        # presigned URL expires and configuration does not.
+                        bundle_url=storage.presign_get(
+                            storage.bundle_key(claims.run_id),
+                            seconds=int(workload["durationSeconds"]) + 600,
+                        ),
+                        bundle_sha256=snapshot.get("bundleSha256", ""),
+                        allowlist=snapshot.get("allowlist", []),
+                        variables=resolved,
                     ).model_dump_json(by_alias=True)
                 )
                 if pushes is None:
@@ -112,6 +132,24 @@ async def agent_channel(websocket: WebSocket, run_id: uuid.UUID) -> None:
                 desired, command = await _desired(claims)
                 await websocket.send_text(
                     HeartbeatAck(desired_state=desired, command=command).model_dump_json(
+                        by_alias=True
+                    )
+                )
+
+            elif kind == "artifact_url_request":
+                request = ArtifactUrlRequest.model_validate(raw)
+                try:
+                    # Built from the token's own run and ordinal, never from
+                    # anything the agent sends: an agent cannot write into
+                    # another run's prefix, or another generator's.
+                    key = storage.artifact_key(claims.run_id, claims.ordinal, request.name)
+                except ValueError:
+                    # The agent names the artifact; the control plane decides
+                    # where it lands, and refuses a name that tries to choose.
+                    await websocket.send_text(Accepted().model_dump_json())
+                    continue
+                await websocket.send_text(
+                    ArtifactUrl(name=request.name, url=storage.presign_put(key)).model_dump_json(
                         by_alias=True
                     )
                 )

@@ -55,6 +55,14 @@ class Registered(BaseModel):
     assigned_users: int = Field(serialization_alias="assignedUsers")
     duration_seconds: int = Field(serialization_alias="durationSeconds")
     ramp_up_seconds: int = Field(serialization_alias="rampUpSeconds")
+    plan_path: str = Field(default="", serialization_alias="planPath")
+    # Signed per registration rather than stored: a presigned URL expires and
+    # configuration does not.
+    bundle_url: str = Field(default="", serialization_alias="bundleUrl")
+    bundle_sha256: str = Field(default="", serialization_alias="bundleSha256")
+    allowlist: list[str] = Field(default_factory=list)
+    # Names to values, for the variables the plan references. In memory only.
+    variables: dict[str, str] = Field(default_factory=dict)
 
 
 class HeartbeatAck(BaseModel):
@@ -72,3 +80,16 @@ class CommandFrame(BaseModel):
 
 class Accepted(BaseModel):
     type: Literal["accepted"] = "accepted"
+
+
+class ArtifactUrlRequest(BaseModel):
+    type: Literal["artifact_url_request"] = "artifact_url_request"
+    name: str
+
+
+class ArtifactUrl(BaseModel):
+    model_config = ConfigDict(serialize_by_alias=True)
+
+    type: Literal["artifact_url"] = "artifact_url"
+    name: str
+    url: str

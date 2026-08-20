@@ -236,3 +236,20 @@ async def touch_heartbeat(session: AsyncSession, run_id: uuid.UUID, ordinal: int
         ),
         {"run": run_id, "ordinal": ordinal},
     )
+
+
+async def record_bundle_digest(session: AsyncSession, run_id: uuid.UUID, digest: str) -> None:
+    """Part of what the run is pinned to: the exact bytes every generator ran.
+
+    It belongs beside the commit SHAs for the same reason they do -- a run that
+    cannot say what it executed cannot be reproduced.
+    """
+    await session.execute(
+        sa.text(
+            "UPDATE test_runs "
+            "SET configuration_snapshot = jsonb_set("
+            "  configuration_snapshot, '{bundleSha256}', to_jsonb(CAST(:digest AS text))) "
+            "WHERE id = :id"
+        ),
+        {"id": run_id, "digest": digest},
+    )

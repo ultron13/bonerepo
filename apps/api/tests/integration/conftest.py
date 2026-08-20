@@ -104,3 +104,17 @@ def admin_org(admin_client: httpx.Client) -> uuid.UUID:
     loop it is running on.
     """
     return uuid.UUID(admin_client.get("/api/v1/auth/me").json()["organizationId"])
+
+
+@pytest.fixture(scope="session")
+def completed_run() -> str:
+    """One real run, executed once and reused: it takes about a minute."""
+    from tests.integration.test_run_execution import TERMINAL, _await_status, _short_test
+
+    with httpx.Client(base_url=API_URL, timeout=30) as client:
+        token = client.post("/api/v1/auth/login", json=ADMIN).json()["accessToken"]
+        client.headers["Authorization"] = f"Bearer {token}"
+        test_id = _short_test(client, seconds=15, users=2)
+        run_id = client.post(f"/api/v1/tests/{test_id}/runs").json()["id"]
+        _await_status(client, run_id, TERMINAL, timeout=300)
+        return str(run_id)

@@ -210,7 +210,10 @@ class Orchestrator:
                         "planPath": plan["planPath"],
                     }
                 )
-        return await stage(run.id, plans)
+        reference = await stage(run.id, plans)
+        async with session_for_org(org_id) as session:
+            await repo.record_bundle_digest(session, run.id, reference.sha256)
+        return reference
 
     async def _pool_image(self, run: sa.Row[Any], org_id: uuid.UUID) -> str:
         async with session_for_org(org_id) as session:

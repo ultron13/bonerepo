@@ -4,7 +4,9 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import RedirectResponse
 
+from plimsoll_api import storage
 from plimsoll_api.allocation import CapacityError, allocate
 from plimsoll_api.db.session import session_for_org
 from plimsoll_api.dependencies import CurrentPrincipal, TenantSession
@@ -184,3 +186,35 @@ async def cancel_run(run_id: uuid.UUID, principal: CurrentPrincipal) -> RunRespo
         row = await service.request_stop(session, principal, run_id, cancel=True)
     await get_bus().announce(run_channel(run_id), {"command": Command.CANCEL.value})
     return _response(row)
+
+
+@router.get(
+    "/api/v1/runs/{run_id}/artifacts",
+    dependencies=[Depends(requires(Permission.TEST_READ))],
+)
+async def list_artifacts(run_id: uuid.UUID, session: TenantSession) -> dict[str, Any]:
+    """Reading results is a read: TEST_READ is enough."""
+    # require() first: the object store knows nothing about tenancy, so the
+    # authorisation has to happen against the run row.
+    await service.require(session, run_id)
+    return {"items": storage.list_prefix(f"runs/{run_id}/generators/")}
+
+
+@router.get(
+    "/api/v1/runs/{run_id}/artifacts/{name}",
+    dependencies=[Depends(requires(Permission.TEST_READ))],
+)
+async def download_artifact(
+    run_id: uuid.UUID, name: str, session: TenantSession
+) -> RedirectResponse:
+    await service.require(session, run_id)
+    # Listing rather than constructing the key is deliberate: the response can
+    # only ever name an object that already exists under this run's prefix.
+    matches = [
+        item for item in storage.list_prefix(f"runs/{run_id}/generators/") if item["name"] == name
+    ]
+    if not matches:
+        raise PlimsollError(ErrorCode.NOT_FOUND, "No such artifact.")
+    # Signed for the public endpoint: this link is followed by a browser or a
+    # CLI outside the cluster, not by an agent inside it.
+    return RedirectResponse(storage.presign_get_public(matches[0]["key"]), status_code=302)

@@ -77,6 +77,11 @@ def test_a_run_reaches_running_and_then_completes(admin_client: httpx.Client) ->
     assert completed["status"] == "COMPLETED", completed
     assert completed["endedAt"] is not None
 
+    # The bundle digest is part of what the run is pinned to, beside the commit
+    # SHAs: a run that cannot say which bytes it executed is not reproducible.
+    snapshot = admin_client.get(f"/api/v1/runs/{run_id}").json()["configurationSnapshot"]
+    assert len(snapshot["bundleSha256"]) == 64, snapshot.get("bundleSha256")
+
 
 def test_every_generator_registers_and_heartbeats(admin_client: httpx.Client) -> None:
     test_id = _short_test(admin_client, seconds=10, users=2)
