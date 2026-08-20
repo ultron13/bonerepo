@@ -33,9 +33,11 @@ from plimsoll_api.messaging import (
 from plimsoll_api.repositories import pools as pools_repo
 from plimsoll_api.repositories import runs as repo
 from plimsoll_api.security.tokens import issue_agent_token
-from plimsoll_api.storage import ensure_bucket
+from plimsoll_api.services import script_repos
+from plimsoll_api.storage import ensure_bucket, presign_get
 from plimsoll_contracts.agent import Command
 from plimsoll_contracts.runs import GeneratorStatus, RunStatus
+from plimsoll_worker.bundle import BundleRef, stage
 from plimsoll_worker.reconciler import Decision, GeneratorRow, RunView, decide, is_silent
 from plimsoll_worker.runtime.base import GeneratorHandle, GeneratorSpec
 from plimsoll_worker.runtime.docker import DockerRuntime
@@ -142,6 +144,17 @@ class Orchestrator:
 
         image = run.configuration_snapshot.get("image") or await self._pool_image(run, org_id)
         ttl = view.duration_seconds + GRACE_SECONDS
+
+        try:
+            # Once per run, before any container exists. An unreachable
+            # repository must fail the run, not produce generators with
+            # nothing to execute.
+            bundle = await self._stage(run, org_id)
+        except Exception:
+            await self._finish(run, org_id, RunStatus.FAILED)
+            raise
+        bundle_url = presign_get(bundle.key, seconds=ttl)
+
         specs = [
             GeneratorSpec(
                 run_id=run.id,
@@ -155,6 +168,10 @@ class Orchestrator:
                     "PLIMSOLL_RUN_TOKEN": issue_agent_token(
                         run.id, ordinal=generator.ordinal, org_id=org_id, ttl_seconds=ttl
                     ),
+                    # A URL, not a credential: it grants this one object for
+                    # this one run's lifetime and nothing else.
+                    "PLIMSOLL_BUNDLE_URL": bundle_url,
+                    "PLIMSOLL_BUNDLE_SHA256": bundle.sha256,
                 },
                 labels={"plimsoll.run": str(run.id)},
             )
@@ -178,6 +195,22 @@ class Orchestrator:
             await repo.transition(
                 session, run.id, expected=[RunStatus.ALLOCATING], to=RunStatus.STARTING
             )
+
+    async def _stage(self, run: sa.Row[Any], org_id: uuid.UUID) -> BundleRef:
+        """Git access is assembled inside a transaction; the fetch happens
+        outside one -- a clone must never hold a database connection open."""
+        async with session_for_org(org_id) as session:
+            plans = []
+            for plan in run.configuration_snapshot["plans"]:
+                repo_row = await script_repos.require(session, uuid.UUID(plan["scriptRepoId"]))
+                plans.append(
+                    {
+                        "access": await script_repos.access_for(session, repo_row),
+                        "commitSha": plan["commitSha"],
+                        "planPath": plan["planPath"],
+                    }
+                )
+        return await stage(run.id, plans)
 
     async def _pool_image(self, run: sa.Row[Any], org_id: uuid.UUID) -> str:
         async with session_for_org(org_id) as session:
