@@ -34,7 +34,15 @@ os.environ["PLIMSOLL_JWT_SECRET"] = os.environ.get(
     "PLIMSOLL_TEST_JWT_SECRET",
     "development-only-secret-change-me",
 )
+# SigV4 signs the Host header, so a presigned URL cannot be rewritten after it
+# is signed -- it has to be signed for the host that will fetch it. These tests
+# run on the host, so they sign against the port compose publishes.
+os.environ["PLIMSOLL_S3_ENDPOINT"] = os.environ.get(
+    "PLIMSOLL_TEST_S3_URL",
+    "http://localhost:9000",
+)
 
+from plimsoll_api import storage
 from plimsoll_api.config import get_settings
 from plimsoll_api.db import session as db_session
 from plimsoll_api.security import secrets
@@ -45,6 +53,8 @@ get_settings.cache_clear()
 db_session.get_engine.cache_clear()
 db_session._session_factory.cache_clear()
 secrets.get_key_provider.cache_clear()
+storage._client.cache_clear()
+storage._public_client.cache_clear()
 
 
 @pytest.fixture(autouse=True)

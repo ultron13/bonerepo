@@ -33,6 +33,7 @@ from plimsoll_api.messaging import (
 from plimsoll_api.repositories import pools as pools_repo
 from plimsoll_api.repositories import runs as repo
 from plimsoll_api.security.tokens import issue_agent_token
+from plimsoll_api.storage import ensure_bucket
 from plimsoll_contracts.agent import Command
 from plimsoll_contracts.runs import GeneratorStatus, RunStatus
 from plimsoll_worker.reconciler import Decision, GeneratorRow, RunView, decide, is_silent
@@ -315,6 +316,9 @@ async def _serve_probes(bus: RedisStreamBus, orchestrator: Orchestrator, consume
 
 async def main() -> None:
     configure_logging(get_settings().log_level)
+    # Here rather than in a migration or a setup script, so `make dev` needs no
+    # extra step and a deployment needs no manual one.
+    ensure_bucket()
     bus = get_bus()
     await bus.ensure_group(RUNS_EXECUTION, WORKER_GROUP)
     await bus.ensure_group(POOL_PROBES, WORKER_GROUP)

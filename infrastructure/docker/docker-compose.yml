@@ -45,6 +45,13 @@ services:
       PLIMSOLL_MIGRATION_DATABASE_URL: postgresql+asyncpg://plimsoll_owner:plimsoll_owner_dev@postgres:5432/plimsoll
       PLIMSOLL_REDIS_URL: redis://redis:6379/0
       PLIMSOLL_S3_ENDPOINT: http://minio:9000
+      PLIMSOLL_S3_ACCESS_KEY: plimsoll
+      PLIMSOLL_S3_SECRET_KEY: plimsoll_dev_secret
+      PLIMSOLL_S3_BUCKET: plimsoll-artifacts
+      # SigV4 signs the Host header, so a link that leaves the compose network
+      # must be signed for the name its user will resolve. Browsers and host
+      # tests reach the published port; agents inside the network do not.
+      PLIMSOLL_S3_PUBLIC_ENDPOINT: http://localhost:9000
       PLIMSOLL_JWT_SECRET: development-only-secret-change-me
       # 32 bytes, base64url. Development only; a deployment generates its own.
       PLIMSOLL_CREDENTIAL_KEY: ZGV2ZWxvcG1lbnQtb25seS1rZXktMzItYnl0ZXMhISE=
@@ -71,6 +78,13 @@ services:
       PLIMSOLL_MIGRATION_DATABASE_URL: postgresql+asyncpg://plimsoll_owner:plimsoll_owner_dev@postgres:5432/plimsoll
       PLIMSOLL_REDIS_URL: redis://redis:6379/0
       PLIMSOLL_S3_ENDPOINT: http://minio:9000
+      PLIMSOLL_S3_ACCESS_KEY: plimsoll
+      PLIMSOLL_S3_SECRET_KEY: plimsoll_dev_secret
+      PLIMSOLL_S3_BUCKET: plimsoll-artifacts
+      # SigV4 signs the Host header, so a link that leaves the compose network
+      # must be signed for the name its user will resolve. Browsers and host
+      # tests reach the published port; agents inside the network do not.
+      PLIMSOLL_S3_PUBLIC_ENDPOINT: http://localhost:9000
       PLIMSOLL_JWT_SECRET: development-only-secret-change-me
       PLIMSOLL_CREDENTIAL_KEY: ZGV2ZWxvcG1lbnQtb25seS1rZXktMzItYnl0ZXMhISE=
       PLIMSOLL_ENVIRONMENT: development

@@ -17,6 +17,8 @@ dependencies = [
     "cryptography>=43.0",
     "defusedxml>=0.7",
     "pyyaml>=6.0",
+    # Signing presigned URLs, and the control plane's own object transfers.
+    "boto3>=1.34",
     # Alembic runs synchronously, so the image needs the sync driver too.
     "psycopg[binary]>=3.1",
 ]
