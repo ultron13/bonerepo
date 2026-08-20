@@ -21,6 +21,7 @@ from plimsoll_api.config import get_settings
 from plimsoll_api.db.session import session_for_org
 from plimsoll_api.logging import configure_logging
 from plimsoll_api.messaging import (
+    ERRORS_KIND,
     METRICS_GROUP,
     METRICS_INGESTION,
     POOL_PROBES,
@@ -33,6 +34,7 @@ from plimsoll_api.messaging import (
     run_channel,
 )
 from plimsoll_api.repositories import pools as pools_repo
+from plimsoll_api.repositories import run_errors as errors_repo
 from plimsoll_api.repositories import runs as repo
 from plimsoll_api.security.tokens import issue_agent_token
 from plimsoll_api.services import results as results_service
@@ -431,8 +433,12 @@ async def _ingest_metrics(bus: RedisStreamBus, consumer: str) -> None:
         )
         if not deliveries:
             continue
+        payloads = [delivery.payload for delivery in deliveries]
+        windows = [item for item in payloads if item.get("kind") != ERRORS_KIND]
+        faults = [item for item in payloads if item.get("kind") == ERRORS_KIND]
+
         try:
-            rows = merge_batch([delivery.payload for delivery in deliveries])
+            rows = merge_batch(windows)
             by_org: dict[uuid.UUID, list[Any]] = {}
             for row in rows:
                 by_org.setdefault(row.organization_id, []).append(row)
@@ -440,7 +446,15 @@ async def _ingest_metrics(bus: RedisStreamBus, consumer: str) -> None:
                 async with session_for_org(org_id) as session:
                     await write(session, owned)
         except Exception:
-            logger.exception("writing %d metric windows failed", len(deliveries))
+            logger.exception("writing %d metric windows failed", len(windows))
+
+        try:
+            for group in faults:
+                org_id = uuid.UUID(group["organizationId"])
+                async with session_for_org(org_id) as session:
+                    await errors_repo.upsert(session, org_id, uuid.UUID(group["runId"]), group)
+        except Exception:
+            logger.exception("writing %d error groups failed", len(faults))
         for delivery in deliveries:
             await bus.acknowledge(METRICS_INGESTION, METRICS_GROUP, delivery)
 

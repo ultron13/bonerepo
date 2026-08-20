@@ -563,6 +563,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/runs/{run_id}/errors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Run Errors
+         * @description Failures grouped by what they are, most frequent first.
+         */
+        get: operations["get_run_errors_api_v1_runs__run_id__errors_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -608,6 +628,31 @@ export interface components {
              * Format: date-time
              */
             createdAt: string;
+        };
+        /** ErrorGroup */
+        ErrorGroup: {
+            /** Fingerprint */
+            fingerprint: string;
+            /** Errorcode */
+            errorCode: string | null;
+            /** Message */
+            message: string | null;
+            /** Transaction */
+            transaction: string | null;
+            /** Count */
+            count: number;
+            /**
+             * Firstseen
+             * Format: date-time
+             */
+            firstSeen: string;
+            /**
+             * Lastseen
+             * Format: date-time
+             */
+            lastSeen: string;
+            /** Sample */
+            sample?: string | null;
         };
         /** Finding */
         Finding: {
@@ -891,6 +936,18 @@ export interface components {
             environment?: string | null;
             /** Tags */
             tags?: string[] | null;
+        };
+        /** RunErrorsResponse */
+        RunErrorsResponse: {
+            /**
+             * Runid
+             * Format: uuid
+             */
+            runId: string;
+            /** Total */
+            total: number;
+            /** Items */
+            items: components["schemas"]["ErrorGroup"][];
         };
         /** RunMetricsResponse */
         RunMetricsResponse: {
@@ -2687,6 +2744,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunMetricsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_errors_api_v1_runs__run_id__errors_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunErrorsResponse"];
                 };
             };
             /** @description Validation Error */

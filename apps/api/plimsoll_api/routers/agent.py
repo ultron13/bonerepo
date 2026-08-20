@@ -14,7 +14,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from plimsoll_api import storage
 from plimsoll_api.db.session import session_for_org
-from plimsoll_api.messaging import METRICS_INGESTION, get_bus, run_channel
+from plimsoll_api.messaging import ERRORS_KIND, METRICS_INGESTION, get_bus, run_channel
 from plimsoll_api.repositories import runs as repo
 from plimsoll_api.security.tokens import AgentClaims, TokenError, decode_agent_token
 from plimsoll_api.services import credentials
@@ -24,6 +24,7 @@ from plimsoll_contracts.agent import (
     ArtifactUrlRequest,
     Command,
     CommandFrame,
+    ErrorsFrame,
     HeartbeatAck,
     MetricsFrame,
     Registered,
@@ -150,6 +151,20 @@ async def agent_channel(websocket: WebSocket, run_id: uuid.UUID) -> None:
                             **window,
                             "runId": str(claims.run_id),
                             "ordinal": str(claims.ordinal),
+                            "organizationId": str(claims.organization_id),
+                        },
+                    )
+                await websocket.send_text(Accepted().model_dump_json())
+
+            elif kind == "errors":
+                faults = ErrorsFrame.model_validate(raw)
+                for group in faults.groups:
+                    await get_bus().publish(
+                        METRICS_INGESTION,
+                        {
+                            **group,
+                            "kind": ERRORS_KIND,
+                            "runId": str(claims.run_id),
                             "organizationId": str(claims.organization_id),
                         },
                     )

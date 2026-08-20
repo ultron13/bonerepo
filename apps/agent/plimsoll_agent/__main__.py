@@ -19,6 +19,7 @@ import httpx
 from plimsoll_agent.aggregation import Folder
 from plimsoll_agent.bundle import BundleError, download
 from plimsoll_agent.channel import VERSION, Channel, command_of, connect
+from plimsoll_agent.errors import ErrorFolder
 from plimsoll_agent.execution import execute
 from plimsoll_agent.jtl import JtlReader
 from plimsoll_agent.lifecycle import Action, next_action
@@ -93,6 +94,15 @@ def _read_more(handle: object) -> str:
     return text
 
 
+async def _ship_errors(channel: Channel, groups: list[dict[str, str]]) -> None:
+    """Grouped failures, on the same terms as the windows: losing them is
+    degraded reporting, never a failed run."""
+    if not groups:
+        return
+    with contextlib.suppress(Exception):
+        await channel.send_raw({"type": "errors", "groups": groups})
+
+
 async def _ship_metrics(channel: Channel, windows: list[SketchWindow]) -> None:
     """A metrics failure never fails a run.
 
@@ -106,7 +116,11 @@ async def _ship_metrics(channel: Channel, windows: list[SketchWindow]) -> None:
 
 
 async def _fold_while_running(
-    channel: Channel, folder: Folder, results: Path, finished: asyncio.Event
+    channel: Channel,
+    folder: Folder,
+    faults: ErrorFolder,
+    results: Path,
+    finished: asyncio.Event,
 ) -> None:
     """Tail the JTL beside JMeter and ship each window as it closes.
 
@@ -124,14 +138,18 @@ async def _fold_while_running(
                 text = await asyncio.to_thread(_read_more, handle)
                 for sample in reader.feed(text):
                     folder.record(sample)
+                    faults.record(sample)
                 await _ship_metrics(channel, folder.drain(time.time()))
+                await _ship_errors(channel, faults.drain())
             if finished.is_set():
                 # One last pass, then close the window JMeter was still filling
                 # when it stopped -- otherwise the end of every run is lost.
                 if handle is not None:
                     for sample in reader.feed(await asyncio.to_thread(_read_more, handle)):
                         folder.record(sample)
+                        faults.record(sample)
                 await _ship_metrics(channel, folder.drain_all())
+                await _ship_errors(channel, faults.drain())
                 return
             await asyncio.wait([asyncio.create_task(finished.wait())], timeout=WINDOW_SECONDS)
     finally:
@@ -217,6 +235,7 @@ async def run_agent() -> int:
                         _fold_while_running(
                             channel,
                             Folder(run_id=run_id, ordinal=ordinal),
+                            ErrorFolder(),
                             OUTPUT / RESULTS_NAME,
                             finished,
                         )

@@ -13,6 +13,7 @@ from plimsoll_api.dependencies import CurrentPrincipal, TenantSession
 from plimsoll_api.errors import PlimsollError
 from plimsoll_api.messaging import RUNS_EXECUTION, get_bus, run_channel
 from plimsoll_api.pagination import page_of, position_from
+from plimsoll_api.repositories import run_errors as errors_repo
 from plimsoll_api.repositories import runs as repo
 from plimsoll_api.security.permissions import Permission, requires
 from plimsoll_api.services import performance_tests, pools, preflight, results, target_policy
@@ -21,7 +22,7 @@ from plimsoll_contracts.agent import Command
 from plimsoll_contracts.errors import ErrorCode
 from plimsoll_contracts.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, Page
 from plimsoll_contracts.performance_tests import WorkloadSpec
-from plimsoll_contracts.results import RunMetricsResponse
+from plimsoll_contracts.results import ErrorGroup, RunErrorsResponse, RunMetricsResponse
 from plimsoll_contracts.runs import GeneratorView, RunResponse, RunStatusResponse
 
 router = APIRouter(tags=["runs"])
@@ -233,3 +234,28 @@ async def get_run_metrics(run_id: uuid.UUID, session: TenantSession) -> RunMetri
     Reading results is a read, so TEST_READ is enough.
     """
     return await results.for_run(session, run_id)
+
+
+@router.get(
+    "/api/v1/runs/{run_id}/errors",
+    response_model=RunErrorsResponse,
+    dependencies=[Depends(requires(Permission.TEST_READ))],
+)
+async def get_run_errors(run_id: uuid.UUID, session: TenantSession) -> RunErrorsResponse:
+    """Failures grouped by what they are, most frequent first."""
+    await service.require(session, run_id)
+    rows = await errors_repo.for_run(session, run_id)
+    items = [
+        ErrorGroup(
+            fingerprint=row.fingerprint,
+            error_code=row.error_code,
+            message=row.message,
+            transaction=row.transaction,
+            count=row.count,
+            first_seen=row.first_seen,
+            last_seen=row.last_seen,
+            sample=(row.sample_detail or {}).get("detail"),
+        )
+        for row in rows
+    ]
+    return RunErrorsResponse(run_id=run_id, total=sum(item.count for item in items), items=items)

@@ -94,6 +94,13 @@ class MetricsFrame(BaseModel):
     windows: list[dict[str, str]]
 
 
+class ErrorsFrame(BaseModel):
+    """Failures already grouped by the generator that saw them."""
+
+    type: Literal["errors"] = "errors"
+    groups: list[dict[str, str]]
+
+
 class ArtifactUrlRequest(BaseModel):
     type: Literal["artifact_url_request"] = "artifact_url_request"
     name: str
