@@ -43,6 +43,15 @@ def run_channel(run_id: Any) -> str:
     return f"runs:{run_id}:commands"
 
 
+def live_channel(run_id: Any) -> str:
+    """Where one run's live events are published, and nowhere else.
+
+    Namespaced like the command channel so a subscriber cannot reach another
+    run's stream by guessing a shorter key.
+    """
+    return f"runs:{run_id}:live"
+
+
 def probe_channel(probe_id: Any) -> str:
     """Where the answer to one probe is published, and nowhere else."""
     return f"pools:probe:{probe_id}"

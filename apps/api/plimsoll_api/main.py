@@ -28,6 +28,7 @@ def create_app() -> FastAPI:
         auth,
         credentials,
         health,
+        live,
         performance_tests,
         pools,
         projects,
@@ -47,6 +48,7 @@ def create_app() -> FastAPI:
     app.include_router(performance_tests.router)
     app.include_router(runs.router)
     app.include_router(agent.router)
+    app.include_router(live.router)
     set_readiness_checks(
         app,
         [

@@ -71,7 +71,7 @@ def merge_batch(messages: list[dict[str, str]]) -> list[MergedWindow]:
     return list(merged.values())
 
 
-async def write(session: AsyncSession, rows: list[MergedWindow]) -> None:
+async def write(session: AsyncSession, rows: list[MergedWindow]) -> list[MergedWindow]:
     """One row per window, merged on conflict.
 
     Two generators reporting the same window may arrive in different reads, and
@@ -84,7 +84,13 @@ async def write(session: AsyncSession, rows: list[MergedWindow]) -> None:
     on the delivery -- costs a second table. The window this leaves open is a
     worker dying between the write and the acknowledgement, and the reporting
     error it produces is bounded by one batch.
+
+    Returns what is now stored for each key, not what arrived. A window can be
+    written more than once -- samples belonging to it may be read after it was
+    drained -- and a live subscriber told the increment rather than the total
+    would show a smaller number than the results endpoint does.
     """
+    stored: list[MergedWindow] = []
     for row in rows:
         window = datetime.fromisoformat(row.window_start)
         existing = (
@@ -105,12 +111,12 @@ async def write(session: AsyncSession, rows: list[MergedWindow]) -> None:
             merged = new_sketch()
             merged.add(from_bytes(existing.sketch))
             merged.add(row.sketch)
-            stored = existing.tags or {}
-            count += int(stored.get("count", 0))
-            errors += int(stored.get("errorCount", 0))
-            total += int(stored.get("total", 0))
-            minimum = min(minimum, int(stored.get("min", minimum)))
-            maximum = max(maximum, int(stored.get("max", 0)))
+            previous = existing.tags or {}
+            count += int(previous.get("count", 0))
+            errors += int(previous.get("errorCount", 0))
+            total += int(previous.get("total", 0))
+            minimum = min(minimum, int(previous.get("min", minimum)))
+            maximum = max(maximum, int(previous.get("max", 0)))
 
         tags = json.dumps(
             {
@@ -135,6 +141,20 @@ async def write(session: AsyncSession, rows: list[MergedWindow]) -> None:
             "sketch": to_bytes(merged),
             "tags": tags,
         }
+        stored.append(
+            MergedWindow(
+                organization_id=row.organization_id,
+                run_id=row.run_id,
+                transaction=row.transaction,
+                window_start=row.window_start,
+                count=count,
+                error_count=errors,
+                minimum=minimum,
+                maximum=maximum,
+                total=total,
+                sketch=merged,
+            )
+        )
         if existing is None:
             await session.execute(
                 sa.text(
@@ -155,3 +175,4 @@ async def write(session: AsyncSession, rows: list[MergedWindow]) -> None:
                 ),
                 parameters,
             )
+    return stored

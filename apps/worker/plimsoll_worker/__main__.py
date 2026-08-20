@@ -30,6 +30,7 @@ from plimsoll_api.messaging import (
     Delivery,
     RedisStreamBus,
     get_bus,
+    live_channel,
     probe_channel,
     run_channel,
 )
@@ -42,6 +43,7 @@ from plimsoll_api.services import script_repos
 from plimsoll_api.services.sla import evaluate
 from plimsoll_api.storage import ensure_bucket, presign_get
 from plimsoll_contracts.agent import Command
+from plimsoll_contracts.metrics import percentile
 from plimsoll_contracts.performance_tests import SlaRuleSpec
 from plimsoll_contracts.runs import GeneratorStatus, RunStatus
 from plimsoll_worker.bundle import BundleRef, stage
@@ -444,7 +446,26 @@ async def _ingest_metrics(bus: RedisStreamBus, consumer: str) -> None:
                 by_org.setdefault(row.organization_id, []).append(row)
             for org_id, owned in by_org.items():
                 async with session_for_org(org_id) as session:
-                    await write(session, owned)
+                    stored = await write(session, owned)
+                for row in stored:
+                    # Announced after the write, so a subscriber never sees a
+                    # window the database does not yet have. The derived values
+                    # come off this window's own merged sketch -- a percentile
+                    # is computed here, never carried here.
+                    await bus.announce(
+                        live_channel(row.run_id),
+                        {
+                            "type": "metric",
+                            "runId": str(row.run_id),
+                            "transaction": row.transaction,
+                            "windowStart": row.window_start,
+                            "count": str(row.count),
+                            "errorCount": str(row.error_count),
+                            "p50": str(percentile(row.sketch, 50)),
+                            "p95": str(percentile(row.sketch, 95)),
+                            "p99": str(percentile(row.sketch, 99)),
+                        },
+                    )
         except Exception:
             logger.exception("writing %d metric windows failed", len(windows))
 
