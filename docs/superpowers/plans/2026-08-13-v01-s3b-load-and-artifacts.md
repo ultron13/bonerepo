@@ -1540,7 +1540,7 @@ git commit -s -m "feat(api): artifacts uploaded by presigned URL and served back
 - Modify: `docs/architecture/02-execution-plane.md`, `docs/architecture/06-api.md`, `README.md`, `CLAUDE.md`
 - Test: `apps/api/tests/integration/test_slice3_demonstration.py`
 
-- [ ] **Step 1: Write the demonstration test**
+- [x] **Step 1: Write the demonstration test**
 
 `apps/api/tests/integration/test_slice3_demonstration.py`:
 
@@ -1601,12 +1601,12 @@ def test_the_generators_are_gone_afterwards(admin_client: httpx.Client) -> None:
     assert remaining == [], f"generators outlived their run: {remaining}"
 ```
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 Run: `make dev-down && make dev && uv run pytest apps/api/tests/integration/test_slice3_demonstration.py -v -m integration`
 Expected: PASS. If the JTL is empty, the plan ran but reached nothing: check the agent's log with `docker compose logs worker` and the target policy allowlist, which must contain `demo-target`.
 
-- [ ] **Step 3: Correct the documents**
+- [x] **Step 3: Correct the documents**
 
 In `docs/architecture/02-execution-plane.md`, replace agent step 2 ("Fetch the plan — shallow, sparse `git clone`") with the bundle, and say why in one sentence: a clone per generator would put the repository credential inside every container running a user-supplied plan. Keep the rest of the sequence.
 
@@ -1616,7 +1616,7 @@ In `README.md`, extend the quickstart with starting a run, polling status, and d
 
 In `CLAUDE.md`, update the status line: execution is no longer specification only.
 
-- [ ] **Step 4: Run everything**
+- [x] **Step 4: Run everything**
 
 ```bash
 make dev-down && make dev
@@ -1624,7 +1624,7 @@ make lint && make typecheck && make test && make test-int
 make contracts && git diff --quiet
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -1635,18 +1635,23 @@ git commit -s -m "docs: the S3 journey, from a defined test to a downloaded JTL"
 
 ## Slice acceptance
 
-- [ ] A run generates real load: the JTL contains samples against `demo-target`
-- [ ] Every generator ran byte-identical inputs, proven by the bundle digest
-- [ ] No Git credential and no object-store credential exists inside a generator
-- [ ] The generator image has no `git` binary and a pinned, checksum-verified JMeter
-- [ ] An agent whose target fails the policy check refuses to generate traffic
-- [ ] Artifacts for every generator land in object storage and download through the API
-- [ ] Generators are gone after the run
-- [ ] `make dev`, `make lint`, `make typecheck`, `make test`, `make test-int`, and `make contracts` all pass, the last leaving the tree clean
+- [x] A run generates real load: the JTL contains samples against `demo-target`
+- [x] Every generator ran byte-identical inputs, proven by the bundle digest
+- [x] No Git credential and no object-store credential exists inside a generator
+- [x] The generator image has no `git` binary and a pinned, checksum-verified JMeter
+- [x] An agent whose target fails the policy check refuses to generate traffic
+- [x] Artifacts for every generator land in object storage and download through the API
+- [x] Generators are gone after the run
+- [x] `make dev`, `make lint`, `make typecheck`, `make test`, `make test-int`, and `make contracts` all pass, the last leaving the tree clean
 
 ## Self-review notes
 
 - **The agent reads target hosts from the plan, not from the wire.** Sending a stored list would have the agent check something another component recorded earlier against the plan it is actually about to execute; the two can drift, and the drift favours the attacker. `bundleSha256` on the snapshot is what ties the plan it holds to the run it was authorised for.
 - **The target-matching rules exist twice**, in `plimsoll_api.services.target_policy` and `plimsoll_agent.targets`, because the agent cannot import the API package. That duplication is the cost of the trust boundary. The tests in `test_targets.py` mirror the control plane's cases on purpose; if one implementation changes, the other must, and a divergence shows up as a run that the control plane permits and the agent refuses.
 - **`test_artifacts_api.py` uses a session-scoped real run.** A run takes tens of seconds, and giving every artifact test its own would make the suite unpleasant enough to skip.
-- **The JMeter checksum in Task 4 is a placeholder on purpose** and will fail the build until it is replaced with the digest Apache publishes. A wrong-but-plausible checksum silently disabling verification is worse than a build that stops.
+- **The JMeter checksum in Task 4 was flagged as a placeholder** but proved to
+  be the digest Apache actually publishes; it was re-derived from
+  `apache-jmeter-5.6.3.tgz.sha512` before the build rather than trusted, and
+  matched. The build fetches from `dlcdn` first and `archive.apache.org` second
+  — the archive is rate limited to roughly 100 KB/s, and which host answered
+  does not establish trust, the checksum does.
