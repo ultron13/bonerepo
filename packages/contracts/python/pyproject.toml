@@ -5,6 +5,9 @@ requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.7",
     "email-validator>=2.1",
+    # The sketch format both ends of the metrics pipeline must agree on, bit
+    # for bit. It lives here so the agent and the worker cannot drift.
+    "hdrhistogram>=0.10",
 ]
 
 [build-system]

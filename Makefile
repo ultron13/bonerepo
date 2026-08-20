@@ -5,7 +5,7 @@ COMPOSE := docker compose -f infrastructure/docker/docker-compose.yml
 
 test:
 	$(UV) pytest apps/api/tests/unit apps/worker/tests/unit apps/agent/tests/unit \
-	  packages/executor-sdk/tests -v
+	  packages/executor-sdk/tests packages/contracts/python/tests -v
 
 lint:
 	$(UV) ruff check .

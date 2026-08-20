@@ -86,6 +86,15 @@ plugins = ["pydantic.mypy"]
 # its test reaches it by path, so mypy needs the same directory.
 mypy_path = ["images/demo-target"]
 
+[[tool.mypy.overrides]]
+# hdrhistogram publishes no stubs and no py.typed marker, and no types- package
+# exists for it. The surface used is tiny -- record_value, encode, decode, add,
+# get_value_at_percentile, get_total_count -- and plimsoll_contracts.metrics is
+# the only module that imports it, so the untyped edge is one file wide and
+# every caller crosses it through a typed function.
+module = ["hdrh.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = [
@@ -93,5 +102,6 @@ testpaths = [
     "apps/worker/tests",
     "apps/agent/tests",
     "packages/executor-sdk/tests",
+    "packages/contracts/python/tests",
 ]
 markers = ["integration: requires the make dev stack"]
