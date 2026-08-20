@@ -661,6 +661,20 @@ produce one row whose sketch is the sum of theirs.
 - [ ] A run whose metrics fail still completes and still reports its artifacts
 - [ ] `make dev`, `make lint`, `make typecheck`, `make test`, `make test-int`, and `make contracts` all pass, the last leaving the tree clean
 
+## Known limitation carried into S4b
+
+The worker merges within a batch and appends. Two generators whose windows
+arrive in different reads leave two rows for one `(run, transaction, window)`
+key. The run summary is exact regardless — it merges every row, and the totals
+were checked against the raw JTLs both generators uploaded — but per-window
+reads see the window twice, and a redelivered message would be counted twice.
+
+S4b reads per window for live streaming, so it must close this first: a unique
+index on `(run_id, entity_id, time)` (permitted on a hypertable because it
+carries the partitioning column) plus an upsert that merges the stored sketch
+with the incoming one rather than replacing it. That is a migration, which this
+slice did not need and S4b does.
+
 ## Deferred to S4b
 
 Live streaming over `/ws/runs/{id}`, grouped errors in `run_errors`, and SLA

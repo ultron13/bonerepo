@@ -15,12 +15,13 @@ from plimsoll_api.messaging import RUNS_EXECUTION, get_bus, run_channel
 from plimsoll_api.pagination import page_of, position_from
 from plimsoll_api.repositories import runs as repo
 from plimsoll_api.security.permissions import Permission, requires
-from plimsoll_api.services import performance_tests, pools, preflight, target_policy
+from plimsoll_api.services import performance_tests, pools, preflight, results, target_policy
 from plimsoll_api.services import runs as service
 from plimsoll_contracts.agent import Command
 from plimsoll_contracts.errors import ErrorCode
 from plimsoll_contracts.pagination import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, Page
 from plimsoll_contracts.performance_tests import WorkloadSpec
+from plimsoll_contracts.results import RunMetricsResponse
 from plimsoll_contracts.runs import GeneratorView, RunResponse, RunStatusResponse
 
 router = APIRouter(tags=["runs"])
@@ -218,3 +219,16 @@ async def download_artifact(
     # Signed for the public endpoint: this link is followed by a browser or a
     # CLI outside the cluster, not by an agent inside it.
     return RedirectResponse(storage.presign_get_public(matches[0]["key"]), status_code=302)
+
+
+@router.get(
+    "/api/v1/runs/{run_id}/metrics",
+    response_model=RunMetricsResponse,
+    dependencies=[Depends(requires(Permission.TEST_READ))],
+)
+async def get_run_metrics(run_id: uuid.UUID, session: TenantSession) -> RunMetricsResponse:
+    """Per-transaction percentiles, derived once from merged sketches.
+
+    Reading results is a read, so TEST_READ is enough.
+    """
+    return await results.for_run(session, run_id)

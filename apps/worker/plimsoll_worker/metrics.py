@@ -66,10 +66,26 @@ def merge_batch(messages: list[dict[str, str]]) -> list[MergedWindow]:
 
 
 async def write(session: AsyncSession, rows: list[MergedWindow]) -> None:
-    """Upsert, because at-least-once delivery means a window may arrive twice.
+    """Append one row per merged batch.
 
-    A repeat carries the same merged sketch for the same key, so replacing the
-    row is idempotent where adding to it would double-count.
+    A window is merged within the batch it arrived in, so two generators whose
+    windows land in different reads leave two rows for the same key. That is
+    additive rather than duplicated -- each row holds a distinct generator's
+    samples, and the read side merges every row for a transaction, so the
+    totals are exact. It is verified against the raw JTLs both generators
+    uploaded, not assumed.
+
+    Two consequences worth knowing before S4b builds on this:
+
+    * A redelivered message would be counted twice. At-least-once is the bus
+      contract, so this is a real if narrow window -- a worker dying between
+      the write and the acknowledgement. Closing it needs a unique key on
+      (run_id, entity_id, time), which a hypertable permits because it
+      includes the partitioning column, and an upsert that merges rather than
+      replaces.
+    * Per-window reads see a window more than once. The run summary is
+      unaffected because it merges everything, but live streaming and
+      continuous aggregates read per window and would show a window twice.
     """
     for row in rows:
         await session.execute(

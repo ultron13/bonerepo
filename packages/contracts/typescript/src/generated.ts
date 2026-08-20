@@ -541,6 +541,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/runs/{run_id}/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Run Metrics
+         * @description Per-transaction percentiles, derived once from merged sketches.
+         *
+         *     Reading results is a read, so TEST_READ is enough.
+         */
+        get: operations["get_run_metrics_api_v1_runs__run_id__metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -870,6 +892,20 @@ export interface components {
             /** Tags */
             tags?: string[] | null;
         };
+        /** RunMetricsResponse */
+        RunMetricsResponse: {
+            /**
+             * Runid
+             * Format: uuid
+             */
+            runId: string;
+            /** Totalsamples */
+            totalSamples: number;
+            /** Totalerrors */
+            totalErrors: number;
+            /** Transactions */
+            transactions: components["schemas"]["TransactionSummary"][];
+        };
         /** RunResponse */
         RunResponse: {
             /**
@@ -1179,6 +1215,33 @@ export interface components {
             tokenType: string;
             /** Expiresin */
             expiresIn: number;
+        };
+        /** TransactionSummary */
+        TransactionSummary: {
+            /** Transaction */
+            transaction: string;
+            /** Count */
+            count: number;
+            /** Errorcount */
+            errorCount: number;
+            /** Errorrate */
+            errorRate: number;
+            /** Min */
+            min: number;
+            /** Max */
+            max: number;
+            /** Mean */
+            mean: number;
+            /** P50 */
+            p50: number;
+            /** P90 */
+            p90: number;
+            /** P95 */
+            p95: number;
+            /** P99 */
+            p99: number;
+            /** Throughput */
+            throughput: number;
         };
         /** ValidationError */
         ValidationError: {
@@ -2591,6 +2654,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_metrics_api_v1_runs__run_id__metrics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunMetricsResponse"];
                 };
             };
             /** @description Validation Error */
