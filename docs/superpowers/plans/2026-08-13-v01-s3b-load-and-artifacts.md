@@ -804,7 +804,7 @@ git commit -s -m "feat(worker): stage the plan once, for every generator"
 **Interfaces:**
 - Produces: `ghcr.io/ultron13/generator:dev` carrying a JRE, JMeter 5.6.3 at `/opt/jmeter`, and the agent.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `apps/worker/tests/integration/test_docker_runtime.py`:
 
@@ -837,12 +837,12 @@ def test_the_generator_image_has_no_git() -> None:
 
 with `import subprocess` at the top.
 
-- [ ] **Step 2: Run it to make sure it fails**
+- [x] **Step 2: Run it to make sure it fails**
 
 Run: `uv run pytest apps/worker/tests/integration/test_docker_runtime.py -v -m integration -k jmeter`
 Expected: FAIL — there is no `/opt/jmeter`.
 
-- [ ] **Step 3: Add JMeter to the image**
+- [x] **Step 3: Add JMeter to the image**
 
 `infrastructure/docker/generator.Dockerfile` gains a download stage and a JRE base. The checksum is not decoration: it is the only thing standing between a mirror compromise and arbitrary code inside every generator.
 
@@ -901,12 +901,12 @@ If the build fails this check, stop and find out why. Relaxing it turns the one
 control standing between a mirror compromise and arbitrary code inside every
 generator into a comment.
 
-- [ ] **Step 4: Build and run the tests**
+- [x] **Step 4: Build and run the tests**
 
 Run: `make dev-down && make dev && uv run pytest apps/worker/tests/integration/test_docker_runtime.py -v -m integration`
 Expected: PASS — six tests. The build is slow the first time; that is the cost accepted in the design so that a run works immediately rather than stalling mid-demo.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -925,7 +925,7 @@ git commit -s -m "feat(generator): JMeter 5.6.3, pinned and verified in the imag
 **Interfaces:**
 - Produces: `download(url, sha256, into) -> Path`; `refuse_disallowed(hosts, allowlist, variables) -> list[str]`; `execute(context) -> Outcome`; `Registered` gains `allowlist`, `variables`, `targets`, and `bundleSha256`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 The target check is pure, and it is the one that must not be got wrong.
 
@@ -989,12 +989,12 @@ def test_a_suffix_rule_does_not_match_a_lookalike() -> None:
         refuse_disallowed(["api.acme.test.evil.com"], allowlist=[".acme.test"], variables={})
 ```
 
-- [ ] **Step 2: Run it to make sure it fails**
+- [x] **Step 2: Run it to make sure it fails**
 
 Run: `uv run pytest apps/agent/tests/unit/test_targets.py -v`
 Expected: FAIL — `ModuleNotFoundError: plimsoll_agent.targets`.
 
-- [ ] **Step 3: Write the agent's three new pieces**
+- [x] **Step 3: Write the agent's three new pieces**
 
 `apps/agent/plimsoll_agent/targets.py`. The matching rules are the control
 plane's, restated here because the agent cannot import `plimsoll_api` — keep the
@@ -1143,7 +1143,7 @@ async def execute(context: ExecutionContext, stop: asyncio.Event) -> Outcome:
     return executor.interpret(process.returncode or 0)
 ```
 
-- [ ] **Step 4: Carry what the agent needs on the wire**
+- [x] **Step 4: Carry what the agent needs on the wire**
 
 In `packages/contracts/python/plimsoll_contracts/agent.py`, extend `Registered`:
 
@@ -1236,7 +1236,7 @@ async def record_bundle_digest(
 
 Import `storage` and `credentials` in the agent router.
 
-- [ ] **Step 5: Rewrite the agent's main loop**
+- [x] **Step 5: Rewrite the agent's main loop**
 
 Replace the S3a placeholder in `apps/agent/plimsoll_agent/__main__.py`:
 
@@ -1297,12 +1297,12 @@ and on `Action.RUN`:
 A `TargetRefused` or `BundleError` reports `FAILED` with the exception's message
 as the reason and exits non-zero, before any traffic is generated.
 
-- [ ] **Step 6: Run the tests and make sure they pass**
+- [x] **Step 6: Run the tests and make sure they pass**
 
 Run: `uv run pytest apps/agent/tests/unit -v`
 Expected: PASS — the eight target tests plus S3a's seven lifecycle tests.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 make contracts && make lint && make typecheck && make test
@@ -1322,7 +1322,7 @@ git commit -s -m "feat(agent): fetch the bundle, refuse a bad target, run JMeter
 **Interfaces:**
 - Produces: `upload_artifacts(channel, directory)`; `GET /runs/{id}/artifacts`; `GET /runs/{id}/artifacts/{name}` answering `302`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `apps/api/tests/integration/test_artifacts_api.py`:
 
@@ -1407,12 +1407,12 @@ def completed_run() -> str:
         return str(run_id)
 ```
 
-- [ ] **Step 2: Run it to make sure it fails**
+- [x] **Step 2: Run it to make sure it fails**
 
 Run: `uv run pytest apps/api/tests/integration/test_artifacts_api.py -v -m integration`
 Expected: FAIL — `404` from a path that does not exist.
 
-- [ ] **Step 3: Sign uploads over the channel**
+- [x] **Step 3: Sign uploads over the channel**
 
 In `apps/api/plimsoll_api/routers/agent.py`, answer `artifact_url_request`:
 
@@ -1437,7 +1437,7 @@ The key is built from the token's own `run_id` and `ordinal`, never from
 anything the agent sends, so an agent cannot write into another run or another
 generator's prefix.
 
-- [ ] **Step 4: Upload from the agent**
+- [x] **Step 4: Upload from the agent**
 
 In `apps/agent/plimsoll_agent/__main__.py`:
 
@@ -1482,7 +1482,7 @@ with `Channel.send_raw` sending a plain dictionary:
         await self._socket.send(json.dumps(payload))
 ```
 
-- [ ] **Step 5: Serve them from the API**
+- [x] **Step 5: Serve them from the API**
 
 In `apps/api/plimsoll_api/routers/runs.py`:
 
@@ -1518,12 +1518,12 @@ async def download_artifact(
 
 importing `RedirectResponse` from `fastapi.responses` and `storage` from `plimsoll_api`. Listing rather than constructing the key is deliberate: the response can only ever name an object that exists under this run's prefix.
 
-- [ ] **Step 6: Run the tests and make sure they pass**
+- [x] **Step 6: Run the tests and make sure they pass**
 
 Run: `make dev-down && make dev && uv run pytest apps/api/tests/integration/test_artifacts_api.py -v -m integration`
 Expected: PASS — six tests.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 make contracts && make lint && make typecheck && make test
