@@ -35,7 +35,7 @@ And an operator can:
 - [x] Create a generator pool for Docker — Kubernetes pools are defined and
       probed, but no Kubernetes runtime exists behind them yet
 - [x] Run everything with `make dev` on a machine that has only Docker
-- [ ] Read a published version support policy — which versions get fixes and
+- [x] Read a published version support policy — which versions get fixes and
       for how long, as [SECURITY.md](../SECURITY.md) commits to for the first
       release
 
