@@ -107,3 +107,41 @@ def test_an_unknown_test_cannot_be_run(admin_client: httpx.Client) -> None:
 
 def test_a_viewer_cannot_start_a_run(viewer_client: httpx.Client) -> None:
     assert _start(viewer_client).status_code == 403
+
+
+def test_recent_runs_span_the_organisation_not_one_page_of_projects(
+    admin_client: httpx.Client,
+) -> None:
+    """The list a person lands on has to be the newest runs there are.
+
+    Assembling it in the browser -- a page of projects, then a request per
+    project -- gets slower with every project and stops being correct long
+    before it stops being fast: once there are more projects than fit in one
+    page, the newest run can belong to a project nobody fetched.
+    """
+    newest = admin_client.get("/api/v1/runs?limit=25").json()["items"]
+    assert newest, "the demo seed and the suite have both produced runs"
+
+    # Newest first, and genuinely ordered rather than grouped by project.
+    stamps = [item["createdAt"] for item in newest]
+    assert stamps == sorted(stamps, reverse=True)
+
+    # The single newest run in the organisation, found without knowing which
+    # project it belongs to -- which is the property the browser cannot have.
+    projects = admin_client.get("/api/v1/projects?limit=100").json()["items"]
+    assert len(projects) > 1, "the premise is that runs span more than one project"
+    assert newest[0]["projectId"] not in {"", None}
+
+
+def test_recent_runs_are_paginated_like_everything_else(admin_client: httpx.Client) -> None:
+    first = admin_client.get("/api/v1/runs?limit=2").json()
+    assert len(first["items"]) == 2
+    if first.get("nextCursor"):
+        second = admin_client.get(f"/api/v1/runs?limit=2&cursor={first['nextCursor']}").json()
+        assert {item["id"] for item in second["items"]}.isdisjoint(
+            {item["id"] for item in first["items"]}
+        )
+
+
+def test_a_viewer_may_read_recent_runs(viewer_client: httpx.Client) -> None:
+    assert viewer_client.get("/api/v1/runs?limit=5").status_code == 200

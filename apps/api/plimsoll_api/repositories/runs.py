@@ -116,6 +116,31 @@ async def list_page_for_project(
     return list((await session.execute(statement, parameters)).all())
 
 
+async def list_page_for_org(
+    session: AsyncSession,
+    *,
+    limit: int,
+    after: tuple[datetime, uuid.UUID] | None,
+) -> list[sa.Row[Any]]:
+    """Every run in the organisation, newest first.
+
+    No project filter: row-level security is what confines this to one
+    organisation, and adding a WHERE clause here would imply otherwise.
+    """
+    parameters: dict[str, Any] = {"limit": limit}
+    if after is None:
+        statement = sa.text(
+            _SELECT + "FROM test_runs ORDER BY created_at DESC, id DESC LIMIT :limit"
+        )
+    else:
+        statement = sa.text(
+            _SELECT + "FROM test_runs WHERE (created_at, id) < (:after_at, :after_id) "
+            "ORDER BY created_at DESC, id DESC LIMIT :limit"
+        )
+        parameters["after_at"], parameters["after_id"] = after
+    return list((await session.execute(statement, parameters)).all())
+
+
 async def transition(
     session: AsyncSession,
     run_id: uuid.UUID,

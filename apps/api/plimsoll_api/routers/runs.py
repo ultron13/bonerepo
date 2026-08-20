@@ -114,6 +114,21 @@ async def start_run(test_id: uuid.UUID, principal: CurrentPrincipal) -> RunRespo
 
 
 @router.get(
+    "/api/v1/runs",
+    response_model=Page[RunResponse],
+    dependencies=[Depends(requires(Permission.TEST_READ))],
+)
+async def list_recent_runs(
+    session: TenantSession,
+    limit: int = Query(default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT),
+    cursor: str | None = None,
+) -> Page[RunResponse]:
+    """What a person wants on landing: the newest runs, wherever they came from."""
+    rows = await repo.list_page_for_org(session, limit=limit + 1, after=position_from(cursor))
+    return page_of(rows, limit, _response)
+
+
+@router.get(
     "/api/v1/projects/{project_id}/runs",
     response_model=Page[RunResponse],
     dependencies=[Depends(requires(Permission.TEST_READ))],

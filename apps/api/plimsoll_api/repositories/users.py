@@ -26,7 +26,10 @@ async def get_profile(session: AsyncSession, user_id: uuid.UUID) -> sa.Row[Any] 
     principal's organisation."""
     return (
         await session.execute(
-            sa.text("SELECT id, email, name, org_role, organization_id FROM users WHERE id = :id"),
+            sa.text(
+                "SELECT id, email, name, org_role, status, organization_id "
+                "FROM users WHERE id = :id"
+            ),
             {"id": user_id},
         )
     ).first()

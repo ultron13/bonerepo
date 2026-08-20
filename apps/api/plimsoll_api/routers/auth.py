@@ -83,6 +83,12 @@ async def refresh_tokens(
 
     if profile is None:
         raise PlimsollError(ErrorCode.UNAUTHENTICATED, "The account no longer exists.")
+    if profile.status != "ACTIVE":
+        # Deactivation revokes this user's token families, so a rotation should
+        # already have been refused. This is the second lock: a family created
+        # in the same moment as the deactivation would otherwise survive it,
+        # and a refresh token lives fourteen days.
+        raise PlimsollError(ErrorCode.UNAUTHENTICATED, "This account is not active.")
 
     _set_refresh_cookie(response, new_token)
     settings = get_settings()

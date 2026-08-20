@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 
 import { Card, Empty, Status } from "@/components/ui";
 import { api, readToken, signIn } from "@/lib/api";
-import type { Page, Project, Run } from "@/lib/types";
+import type { Me, Page, Run } from "@/lib/types";
 
 function SignIn({ onDone }: { onDone: () => void }) {
   const [email, setEmail] = useState("admin@demo.plimsoll.dev");
@@ -64,32 +64,20 @@ function SignIn({ onDone }: { onDone: () => void }) {
 }
 
 function Runs() {
-  const projects = useQuery({
-    queryKey: ["projects"],
-    queryFn: () => api.get<Page<Project>>("/api/v1/projects?limit=50"),
-  });
-
   const runs = useQuery({
-    queryKey: ["runs", projects.data?.items.map((item) => item.id)],
-    enabled: Boolean(projects.data),
-    queryFn: async () => {
-      const pages = await Promise.all(
-        (projects.data?.items ?? []).map((project) =>
-          api.get<Page<Run>>(`/api/v1/projects/${project.id}/runs?limit=10`),
-        ),
-      );
-      return pages
-        .flatMap((page) => page.items)
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-        .slice(0, 30);
-    },
+    queryKey: ["runs"],
+    // One request for the organisation's newest runs. This used to be a page
+    // of projects followed by a request per project, which got slower with
+    // every project and stopped being correct well before that: past one page
+    // of projects, the newest run could belong to one nobody had fetched.
+    queryFn: () => api.get<Page<Run>>("/api/v1/runs?limit=30"),
     // A list of runs goes stale the moment one of them moves.
     refetchInterval: 5_000,
   });
 
-  if (projects.isError) return <Empty>Could not reach the API.</Empty>;
+  if (runs.isError) return <Empty>Could not reach the API.</Empty>;
   if (!runs.data) return <Empty>Loading…</Empty>;
-  if (runs.data.length === 0) return <Empty>No runs yet.</Empty>;
+  if (runs.data.items.length === 0) return <Empty>No runs yet.</Empty>;
 
   return (
     <table className="w-full text-sm">
@@ -102,20 +90,29 @@ function Runs() {
         </tr>
       </thead>
       <tbody className="font-mono">
-        {runs.data.map((run) => (
+        {runs.data.items.map((run) => (
           <tr key={run.id} className="border-t border-line">
             <td className="py-2">
-              <Link className="text-accent hover:underline" href={`/runs/${run.id}`}>
+              <Link
+                className="text-accent hover:underline"
+                href={`/runs/${run.id}`}
+              >
                 #{run.runNumber}
               </Link>
-              {run.degraded ? <span className="ml-2 text-xs text-warn">degraded</span> : null}
+              {run.degraded ? (
+                <span className="ml-2 text-xs text-warn">degraded</span>
+              ) : null}
             </td>
             <td className="py-2">
               <Status value={run.status} />
             </td>
-            <td className="py-2">{run.slaResult ? <Status value={run.slaResult} /> : "—"}</td>
+            <td className="py-2">
+              {run.slaResult ? <Status value={run.slaResult} /> : "—"}
+            </td>
             <td className="py-2 text-muted">
-              {run.startedAt ? new Date(run.startedAt).toLocaleTimeString() : "—"}
+              {run.startedAt
+                ? new Date(run.startedAt).toLocaleTimeString()
+                : "—"}
             </td>
           </tr>
         ))}
@@ -130,16 +127,42 @@ export default function Home() {
 
   useEffect(() => setSignedIn(Boolean(readToken())), []);
 
+  const me = useQuery({
+    queryKey: ["me"],
+    enabled: signedIn === true,
+    queryFn: () => api.get<Me>("/api/v1/auth/me"),
+  });
+
   if (signedIn === null) return null;
-  if (!signedIn) return <SignIn onDone={() => { setSignedIn(true); router.refresh(); }} />;
+  if (!signedIn)
+    return (
+      <SignIn
+        onDone={() => {
+          setSignedIn(true);
+          router.refresh();
+        }}
+      />
+    );
 
   return (
     <main className="space-y-6">
       <div className="flex items-baseline justify-between">
         <h1 className="text-xl font-semibold text-slate-100">Runs</h1>
-        <Link className="text-sm text-accent hover:underline" href="/projects">
-          Projects →
-        </Link>
+        <nav className="flex gap-4 text-sm">
+          {/* Hidden from a viewer because a link that answers 403 is not
+              navigation. The refusal itself is the server's, not this. */}
+          {me.data?.orgRole === "ORG_ADMIN" ? (
+            <Link
+              className="text-accent hover:underline"
+              href="/settings/users"
+            >
+              People
+            </Link>
+          ) : null}
+          <Link className="text-accent hover:underline" href="/projects">
+            Projects →
+          </Link>
+        </nav>
       </div>
       <Card>
         <Runs />

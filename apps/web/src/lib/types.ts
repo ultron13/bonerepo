@@ -76,8 +76,14 @@ export interface Run {
   endedAt: string | null;
   createdAt: string;
   slaResult: string | null;
-  summary: { generators?: number; sla?: { detail: string; rules: SlaRuleOutcome[] } } | null;
-  configurationSnapshot: { bundleSha256?: string; plans?: { commitSha: string }[] };
+  summary: {
+    generators?: number;
+    sla?: { detail: string; rules: SlaRuleOutcome[] };
+  } | null;
+  configurationSnapshot: {
+    bundleSha256?: string;
+    plans?: { commitSha: string }[];
+  };
 }
 
 export interface TransactionSummary {
@@ -174,4 +180,28 @@ export interface VerifyFinding {
 export interface VerifyReport {
   ok: boolean;
   findings: VerifyFinding[];
+}
+
+export type OrgRole = "ORG_ADMIN" | "VIEWER";
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  orgRole: OrgRole;
+  status: "ACTIVE" | "SUSPENDED";
+  createdAt: string;
+}
+
+export interface UserInvited extends User {
+  /** Returned once, at invitation. There is no endpoint that shows it again. */
+  temporaryPassword: string;
+}
+
+export interface Me {
+  id: string;
+  email: string;
+  name: string;
+  orgRole: OrgRole;
+  organizationId: string;
 }

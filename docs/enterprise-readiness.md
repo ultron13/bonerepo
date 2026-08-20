@@ -103,23 +103,33 @@ development runtime.
 **Needs:** the `KubernetesRuntime` behind the existing `GeneratorRuntime`
 protocol, and a Helm chart. This is the largest item here.
 
-### 7. One organisation, one identity provider
+### 7. One organisation, one identity provider — half closed
 
-Row-level security is enforced on every table and the plumbing is multi-tenant,
-but there is no product surface for organisations, no role beyond `ADMIN` and
-`VIEWER`, no API keys, and no OIDC. The roadmap puts SSO at v0.3 and notes it
-gates enterprise pilots.
+**Fixed: there is now a user directory.** Until this, a user existed only if
+`seed.py` wrote one, so a second person needed a hand-written `INSERT`. That
+made the product single-user in practice — an evaluation by two people was not
+possible without a database client. Administrators can now invite, promote,
+demote, deactivate and reactivate, from the API or the browser.
+
+Chasing it found the fault that mattered more. Deactivation was assumed to be
+a matter of setting a status, and login did check it — but `refresh` did not.
+A refresh token lives fourteen days and mints access tokens the whole time, so
+removing somebody would have delayed their access rather than ended it. Both
+locks are now in place and each was verified to catch it alone: deactivation
+revokes the user's token families, and `refresh` refuses an inactive account.
+
+The last active administrator cannot be demoted or deactivated, because an
+organisation with nobody who can administer it has no way back.
+
+**Still open:** OIDC, and organisations as a product surface — creating one,
+and roles beyond `ORG_ADMIN` and `VIEWER`. The roadmap puts SSO at v0.3 and
+notes it gates enterprise pilots.
 
 ### 8. Operational edges
 
 - The worker container runs as root to reach the Docker socket. Development
   only, and commented as such, but it is the one container that does.
 - No resource limits on any compose service.
-- No backup or restore story for Postgres or the object store.
-- `make e2e` is referenced in the README and does not exist; the browser
-  journey was verified by hand.
-- The web interface cannot create projects, repositories, or tests, so a first
-  run still needs the terminal.
 
 ## Order of work
 
@@ -130,8 +140,10 @@ gates enterprise pilots.
 5. ~~API keys with scopes~~ — done
 6. ~~Generator resource limits~~ — done
 7. Kubernetes runtime and Helm chart — the largest remaining item
-8. OIDC, and the multi-tenancy product surface
-9. Backup and restore; `make e2e`; the web interface's missing half
+8. ~~User directory: invite, roles, offboarding~~ — done
+9. ~~Backup and restore; `make e2e`; the web interface's missing half~~ — done
+10. ~~Credential key rotation~~ — done
+11. OIDC, and organisations as a product surface
 
 Each is landed the way the rest of this repository was: a failing test first,
 the change, then the gates.

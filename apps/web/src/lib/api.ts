@@ -55,7 +55,18 @@ export function apiBase(): string {
   return BASE;
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+/**
+ * `signingIn` marks the one request whose 401 is an answer rather than an
+ * expiry. Everything else that gets a 401 has presented a token that is no
+ * longer good, and the session ends; sign-in has presented a password that
+ * was wrong, and the person needs to be told so rather than returned to a
+ * blank form.
+ */
+async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  signingIn = false,
+): Promise<T> {
   const token = readToken();
   const response = await fetch(`${BASE}${path}`, {
     ...init,
@@ -66,7 +77,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     },
   });
 
-  if (response.status === 401) {
+  if (response.status === 401 && !signingIn) {
     // The access token has a short life and this client does not yet rotate
     // its refresh token, so an expired session becomes a sign-in rather than a
     // page of failures the user cannot act on.
@@ -83,7 +94,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     let details: Record<string, unknown> | undefined;
     try {
       const body = (await response.json()) as {
-        error?: { code?: string; message?: string; details?: Record<string, unknown> };
+        error?: {
+          code?: string;
+          message?: string;
+          details?: Record<string, unknown>;
+        };
       };
       const envelope = body.error ?? {};
       code = envelope.code ?? code;
@@ -102,13 +117,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>
-    request<T>(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
+    request<T>(path, {
+      method: "POST",
+      body: body ? JSON.stringify(body) : undefined,
+    }),
+  patch: <T>(path: string, body: unknown) =>
+    request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
 };
 
 export async function signIn(email: string, password: string): Promise<void> {
-  const body = await request<{ accessToken: string }>("/api/v1/auth/login", {
-    method: "POST",
-    body: JSON.stringify({ email, password }),
-  });
+  const body = await request<{ accessToken: string }>(
+    "/api/v1/auth/login",
+    { method: "POST", body: JSON.stringify({ email, password }) },
+    true,
+  );
   storeToken(body.accessToken);
 }
