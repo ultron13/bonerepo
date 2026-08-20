@@ -91,3 +91,46 @@ def test_the_generator_image_has_no_git() -> None:
     credential that staging exists to avoid."""
     result = _in_image("sh", IMAGE, "-c", "command -v git")
     assert result.returncode != 0, f"git is present at {result.stdout.strip()}"
+
+
+async def test_a_generator_is_bounded() -> None:
+    """A generator is the most likely thing here to exhaust a host.
+
+    JMeter holds a heap sized for the load it is asked to produce, and an
+    unbounded container that grows into the host takes the worker, the API and
+    the database down with it -- the control plane killed by the thing it was
+    controlling. A bounded one that runs out is capacity loss, which the run
+    already knows how to report.
+    """
+    runtime = DockerRuntime()
+    spec = GeneratorSpec(
+        run_id=uuid.uuid4(),
+        ordinal=0,
+        image=IMAGE,
+        network="plimsoll_default",
+        environment={"PLIMSOLL_SLEEP_FOREVER": "1"},
+        labels={"plimsoll.test": "true"},
+        memory_limit="512m",
+        cpu_limit=1.5,
+    )
+    handles = await runtime.provision([spec])
+    try:
+        limits = await runtime.limits_of(handles[0])
+        assert limits["memory"] == 512 * 1024 * 1024
+        assert limits["nano_cpus"] == 1_500_000_000
+    finally:
+        await runtime.teardown(handles)
+
+
+async def test_a_generator_without_configured_limits_is_still_bounded() -> None:
+    """No limit is not a safe default for this container.
+
+    A pool that says nothing about resources gets the documented default rather
+    than the host's entire memory.
+    """
+    runtime = DockerRuntime()
+    handles = await runtime.provision([_spec(0)])
+    try:
+        assert (await runtime.limits_of(handles[0]))["memory"] > 0
+    finally:
+        await runtime.teardown(handles)

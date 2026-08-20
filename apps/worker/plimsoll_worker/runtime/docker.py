@@ -19,6 +19,13 @@ from docker.errors import DockerException, ImageNotFound, NotFound
 
 from plimsoll_worker.runtime.base import GeneratorHandle, GeneratorSpec, GeneratorState
 
+# Room for the JVM heap the agent asks for -- one gigabyte by default -- plus
+# JMeter's own overhead and the sample buffer, with headroom. A pool driving
+# more virtual users per generator raises this alongside the heap; raising one
+# without the other is how a generator gets killed mid-run.
+DEFAULT_MEMORY_LIMIT = "2g"
+DEFAULT_CPU_LIMIT = 2.0
+
 
 class DockerRuntime:
     def __init__(self) -> None:
@@ -43,8 +50,13 @@ class DockerRuntime:
             # the name that disables restarting; the stubs list only the names
             # that enable it, so the cast covers a stub gap, not a wrong value.
             restart_policy=cast("Any", {"Name": "no"}),
-            mem_limit=spec.memory_limit,
-            nano_cpus=int(spec.cpu_limit * 1_000_000_000) if spec.cpu_limit else None,
+            # Bounded either way. An unbounded generator that grows into
+            # the host kills the worker, the API and the database -- the
+            # control plane killed by the thing it was controlling. One that
+            # runs out of its own memory is capacity loss, which a run already
+            # knows how to report.
+            mem_limit=spec.memory_limit or DEFAULT_MEMORY_LIMIT,
+            nano_cpus=int((spec.cpu_limit or DEFAULT_CPU_LIMIT) * 1_000_000_000),
         )
         return str(container.id)
 
@@ -113,6 +125,18 @@ class DockerRuntime:
     async def teardown(self, handles: list[GeneratorHandle]) -> None:
         for handle in handles:
             await asyncio.to_thread(self._remove, handle)
+
+    async def limits_of(self, handle: GeneratorHandle) -> dict[str, int]:
+        """What the daemon actually applied, rather than what was asked for."""
+
+        def read() -> dict[str, int]:
+            config = self._client.containers.get(handle.external_ref).attrs["HostConfig"]
+            return {
+                "memory": int(config.get("Memory") or 0),
+                "nano_cpus": int(config.get("NanoCpus") or 0),
+            }
+
+        return await asyncio.to_thread(read)
 
     async def restart_policy(self, handle: GeneratorHandle) -> str:
         def read() -> str:

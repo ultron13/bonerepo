@@ -17,6 +17,9 @@ class GeneratorSpec:
     network: str
     environment: dict[str, str] = field(default_factory=dict)
     labels: dict[str, str] = field(default_factory=dict)
+    # Never None in practice: a generator is the most likely thing here to
+    # exhaust a host, and an unbounded one takes the control plane down with
+    # it. A pool that says nothing gets the documented default.
     memory_limit: str | None = None
     cpu_limit: float | None = None
 

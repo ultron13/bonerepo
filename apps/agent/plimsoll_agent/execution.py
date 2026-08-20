@@ -10,6 +10,14 @@ import signal
 from plimsoll_executor.base import ExecutionContext, Outcome
 from plimsoll_executor.jmeter import JMeterExecutor
 
+# The heap is sized from the container rather than fixed, because the container
+# is sized by the pool. A fixed -Xmx larger than the limit is killed the moment
+# the heap grows into it, and one smaller wastes what the operator paid for.
+# Modern JVMs read the cgroup limit, so a percentage tracks whatever the pool
+# was configured with -- and 75% leaves room for JMeter's own non-heap memory,
+# the sample buffer, and the thread stacks a load generator is full of.
+DEFAULT_JVM_ARGS = "-XX:InitialRAMPercentage=40 -XX:MaxRAMPercentage=75"
+
 
 async def execute(context: ExecutionContext, stop: asyncio.Event) -> Outcome:
     """Run the engine, and wind it down on request.
@@ -34,7 +42,7 @@ async def execute(context: ExecutionContext, stop: asyncio.Event) -> Outcome:
         start_new_session=True,
         # The resolved variables reach the engine on argv inside this
         # container, and are never written to disk.
-        env={**os.environ, "JVM_ARGS": os.environ.get("JVM_ARGS", "-Xms512m -Xmx1g")},
+        env={**os.environ, "JVM_ARGS": os.environ.get("JVM_ARGS", DEFAULT_JVM_ARGS)},
     )
 
     async def wind_down() -> None:

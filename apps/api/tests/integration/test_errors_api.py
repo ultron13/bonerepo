@@ -33,12 +33,19 @@ def test_every_group_is_well_formed(admin_client: httpx.Client, completed_run: s
         assert item["sample"]
 
 
-def test_failures_group_rather_than_repeat(admin_client: httpx.Client) -> None:
-    """The point of grouping, asserted where it cannot pass vacuously.
+def test_failures_reach_the_api_as_counted_groups(admin_client: httpx.Client) -> None:
+    """The pipeline, end to end, asserted on what is deterministic.
 
-    The demo target fails a fixed fraction of requests, so a run with enough
-    samples reliably produces more failures than distinct faults -- and the
-    groups must be fewer than the occurrences they cover.
+    That grouping compresses is proven where it can be: `test_errors.py` folds
+    fifty identical failures into one group with a count of fifty. Repeating
+    that here would depend on the demo target's one-percent failure rate
+    producing two of the *same* fault in one short run -- two coin flips, and a
+    test that fails for reasons unrelated to the code.
+
+    What this asserts instead holds every time: failures reach the API, they
+    arrive as groups whose counts add up to the total, and they collapse into
+    the handful of faults the plan can actually produce rather than one row per
+    occurrence.
     """
     from tests.integration.test_run_execution import TERMINAL, _await_status, _short_test
 
@@ -56,7 +63,12 @@ def test_failures_group_rather_than_repeat(admin_client: httpx.Client) -> None:
     total = int(str(body["total"]))
     groups = list(body["items"])  # type: ignore[call-overload]
     assert total > 0, "the demo target injects failures; none were recorded"
-    assert len(groups) < total, (len(groups), total)
+    # Counts are real, not placeholders.
+    assert sum(int(group["count"]) for group in groups) == total, groups
+    # The plan drives three transactions, so three faults is the ceiling. One
+    # row per occurrence would pass this only while failures were vanishingly
+    # rare, and blow past it the moment they were not.
+    assert len(groups) <= 3, groups
 
 
 def test_a_viewer_may_read_errors(viewer_client: httpx.Client, completed_run: str) -> None:

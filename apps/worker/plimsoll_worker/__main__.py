@@ -190,7 +190,7 @@ class Orchestrator:
         # what stops this attempt colliding with their deterministic names.
         adopted = await self._adopt_orphans(run.id, org_id, view)
 
-        image = run.configuration_snapshot.get("image") or await self._pool_image(run, org_id)
+        image, resources = await self._pool_settings(run, org_id)
         ttl = view.duration_seconds + GRACE_SECONDS
 
         try:
@@ -222,6 +222,8 @@ class Orchestrator:
                     "PLIMSOLL_BUNDLE_SHA256": bundle.sha256,
                 },
                 labels={"plimsoll.run": str(run.id)},
+                memory_limit=resources.get("memoryLimit"),
+                cpu_limit=resources.get("cpuLimit"),
             )
             # An ordinal that already carries a container is never given a
             # second one, so a retried provision fills only the gaps.
@@ -291,14 +293,28 @@ class Orchestrator:
             await repo.record_bundle_digest(session, run.id, reference.sha256)
         return reference
 
-    async def _pool_image(self, run: sa.Row[Any], org_id: uuid.UUID) -> str:
+    async def _pool_settings(
+        self, run: sa.Row[Any], org_id: uuid.UUID
+    ) -> tuple[str, dict[str, Any]]:
+        """The image and the resources a generator from this pool gets.
+
+        Sizing belongs to the pool because it belongs with the capacity the
+        pool already declares: a pool driving 2000 virtual users per generator
+        needs a bigger heap and a bigger container than one driving 200, and
+        the two numbers have to move together.
+        """
+        snapshot = run.configuration_snapshot
         async with session_for_org(org_id) as session:
-            pool = await pools_repo.get(
-                session, uuid.UUID(run.configuration_snapshot["workload"]["generatorPoolId"])
-            )
+            pool = await pools_repo.get(session, uuid.UUID(snapshot["workload"]["generatorPoolId"]))
         if pool is None:
             raise RuntimeError(f"Run {run.id} names a generator pool that no longer exists.")
-        return str(pool.config["image"])
+
+        config = dict(pool.config)
+        image = str(snapshot.get("image") or config["image"])
+        resources = {
+            key: config[key] for key in ("memoryLimit", "cpuLimit") if config.get(key) is not None
+        }
+        return image, resources
 
     async def _command(
         self, run_id: uuid.UUID, org_id: uuid.UUID, status: RunStatus, command: Command

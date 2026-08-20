@@ -97,3 +97,78 @@ def test_a_duplicate_execution_message_provisions_once(admin_client: httpx.Clien
     assert len(_await_status(admin_client, run_id, {"RUNNING"})["generators"]) == expected
 
     _await_status(admin_client, run_id, TERMINAL)
+
+
+def test_a_pool_sizes_the_generators_it_launches(admin_client: httpx.Client) -> None:
+    """Sizing belongs with the capacity the pool already declares.
+
+    A pool driving two thousand virtual users per generator needs a bigger
+    container than one driving two hundred, and an operator who cannot say so
+    is left with a default that is wrong for one of them.
+    """
+    import shutil
+    import subprocess
+
+    docker = shutil.which("docker") or "docker"
+    pool_id = admin_client.post(
+        "/api/v1/generator-pools",
+        json={
+            "name": f"sized-{uuid.uuid4().hex[:8]}",
+            "runtime": "docker",
+            "config": {
+                "image": "ghcr.io/ultron13/generator:dev",
+                "memoryLimit": "768m",
+                "cpuLimit": 1,
+            },
+            "maxGenerators": 1,
+            "maxVusPerGenerator": 2,
+        },
+    ).json()["id"]
+
+    project_id = admin_client.post(
+        "/api/v1/projects",
+        json={"name": "Sized", "projectKey": f"Z{uuid.uuid4().hex[:8].upper()}"},
+    ).json()["id"]
+    repo_id = admin_client.post(
+        f"/api/v1/projects/{project_id}/script-repos",
+        json={
+            "name": f"sized-{uuid.uuid4().hex[:6]}",
+            "repoUrl": "http://script-fixture/public/plans.git",
+            "planPath": "perf/checkout.jmx",
+            "defaultRef": "main",
+        },
+    ).json()["id"]
+    test_id = admin_client.post(
+        f"/api/v1/projects/{project_id}/tests",
+        json={
+            "name": "sized",
+            "configuration": {
+                "virtualUsers": 2,
+                "durationSeconds": 60,
+                "rampUpSeconds": 1,
+                "generatorPoolId": pool_id,
+            },
+            "plans": [{"scriptRepoId": repo_id, "virtualUsers": 2, "executionOrder": 1}],
+            "slaRules": [],
+        },
+    ).json()["id"]
+
+    run_id = admin_client.post(f"/api/v1/tests/{test_id}/runs").json()["id"]
+    try:
+        _await_status(admin_client, run_id, {"RUNNING"}, timeout=300)
+        container = subprocess.run(  # noqa: S603
+            [docker, "ps", "-q", "--filter", f"label=plimsoll.run={run_id}"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.split()[0]
+        applied = subprocess.run(  # noqa: S603
+            [docker, "inspect", container, "--format", "{{.HostConfig.Memory}}"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        assert int(applied) == 768 * 1024 * 1024, applied
+    finally:
+        admin_client.post(f"/api/v1/runs/{run_id}/stop")
+        _await_status(admin_client, run_id, TERMINAL, timeout=300)
