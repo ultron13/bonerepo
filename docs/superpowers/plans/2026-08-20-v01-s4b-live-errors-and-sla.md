@@ -32,15 +32,15 @@ S4a appends: two generators whose windows arrive in different reads leave two
 rows for one key. The run summary is exact because it merges everything, but a
 per-window read sees the window twice, and a redelivered message counts twice.
 
-- [ ] **Step 1: Write the failing test** — write the same window twice and
+- [x] **Step 1: Write the failing test** — write the same window twice and
       assert one row, with the second write merged into the first rather than
       replacing it or adding a row.
-- [ ] **Step 2: The migration.** `UNIQUE (run_id, entity_id, time)` is
+- [x] **Step 2: The migration.** `UNIQUE (run_id, entity_id, time)` is
       permitted on a hypertable because it carries the partitioning column.
-- [ ] **Step 3: Merge on conflict.** Read the stored sketch, merge the incoming
+- [x] **Step 3: Merge on conflict.** Read the stored sketch, merge the incoming
       one into it, and write back within one transaction. Replacing would lose
       the other generator's samples; adding a row is what this task removes.
-- [ ] **Step 4: Run everything and commit.**
+- [x] **Step 4: Run everything and commit.**
 
 ---
 
