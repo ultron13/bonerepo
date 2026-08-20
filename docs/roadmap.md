@@ -24,7 +24,7 @@ A user can:
 - [x] Start a run across N generator containers
 - [ ] Watch live metrics stream over WebSocket
 - [x] Stop a run cleanly, idempotently
-- [ ] See results with **correctly merged** percentiles
+- [x] See results with **correctly merged** percentiles
 - [ ] See grouped errors with counts and samples
 - [ ] See SLA pass/fail per rule
 - [x] Download raw run artifacts
