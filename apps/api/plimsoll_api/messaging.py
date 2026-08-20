@@ -86,6 +86,13 @@ class RedisStreamBus:
     def __init__(self, url: str | None = None) -> None:
         self._client = redis.from_url(url or get_settings().redis_url, decode_responses=True)
 
+    @property
+    def client(self) -> redis.Redis:
+        """For the few things that need Redis as a store rather than a bus --
+        counters with a lifetime, not messages. They share the connection pool
+        rather than opening a second one."""
+        return self._client
+
     async def publish(self, stream: str, payload: dict[str, str]) -> str:
         # redis-py's stub is invariant in the field/value dict and, with
         # decode_responses=True, still types the id as `bytes | str`; both are

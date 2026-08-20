@@ -30,12 +30,19 @@ _STATUS_TO_CODE = {
 
 class PlimsollError(Exception):
     def __init__(
-        self, code: ErrorCode, message: str, details: dict[str, Any] | None = None
+        self,
+        code: ErrorCode,
+        message: str,
+        details: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
         self.details = details
+        # A refusal that carries no advice leaves a client guessing. Retry-After
+        # is the one case so far, and the envelope stays the same shape.
+        self.headers = headers
 
 
 def _request_id(request: Request) -> str:
@@ -52,19 +59,24 @@ def _request_id(request: Request) -> str:
 
 
 def _envelope(
-    request: Request, code: ErrorCode, message: str, details: dict[str, Any] | None
+    request: Request,
+    code: ErrorCode,
+    message: str,
+    details: dict[str, Any] | None,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     envelope = ErrorEnvelope.of(code, message, _request_id(request), details)
     return JSONResponse(
         status_code=HTTP_STATUS_FOR_CODE[code],
         content=envelope.model_dump(mode="json", exclude_none=True),
+        headers=headers,
     )
 
 
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(PlimsollError)
     async def _plimsoll(request: Request, exc: PlimsollError) -> JSONResponse:
-        return _envelope(request, exc.code, exc.message, exc.details)
+        return _envelope(request, exc.code, exc.message, exc.details, exc.headers)
 
     @app.exception_handler(HTTPException)
     async def _http(request: Request, exc: HTTPException) -> JSONResponse:

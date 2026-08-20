@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     # origin would let any page a user visits spend it.
     cors_origins: str = "http://localhost:3000"
 
+    # Failed sign-ins only. The per-address limit does the real work; the
+    # per-account one is generous because a stranger must not be able to aim it
+    # at a colleague.
+    auth_failure_limit: int = 8
+    auth_failure_limit_per_address: int = 40
+    auth_failure_window_seconds: int = 900
+    # Whether X-Forwarded-For may be believed. Off unless a deployment says it
+    # sits behind a proxy that sets it: trusting it by default lets anyone claim
+    # a fresh address per attempt and walk through the throttle.
+    trust_proxy_headers: bool = False
+
     access_token_ttl_seconds: int = 900
     refresh_token_ttl_seconds: int = 1_209_600
     environment: str = "development"

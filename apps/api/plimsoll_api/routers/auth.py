@@ -1,12 +1,18 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Cookie, Response
+from fastapi import APIRouter, Cookie, Request, Response
 
 from plimsoll_api.config import get_settings
 from plimsoll_api.db.session import session_for_org
 from plimsoll_api.dependencies import AnonymousSession, CurrentPrincipal, TenantSession
 from plimsoll_api.errors import PlimsollError
 from plimsoll_api.repositories import users as user_repo
+from plimsoll_api.security.throttle import (
+    client_address,
+    record_failure,
+    record_success,
+    refuse_if_throttled,
+)
 from plimsoll_api.security.tokens import issue_access_token
 from plimsoll_api.services.auth import AuthenticationFailed, authenticate
 from plimsoll_api.services.refresh import RefreshRejected, organization_for, rotate
@@ -35,13 +41,20 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
 @router.post("/login", response_model=TokenResponse)
 async def login(
     body: LoginRequest,
+    request: Request,
     response: Response,
     session: AnonymousSession,
 ) -> TokenResponse:
+    address = client_address(request)
+    # Before the password is checked, so a throttled request does not take as
+    # long as a real one and become a way to learn which accounts exist.
+    await refuse_if_throttled(body.email, address)
     try:
         access, refresh, ttl = await authenticate(session, body.email, body.password)
     except AuthenticationFailed as exc:
+        await record_failure(body.email, address)
         raise PlimsollError(ErrorCode.UNAUTHENTICATED, str(exc)) from exc
+    await record_success(body.email)
     _set_refresh_cookie(response, refresh)
     return TokenResponse(access_token=access, expires_in=ttl)
 
