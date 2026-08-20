@@ -39,6 +39,20 @@ And an operator can:
       for how long, as [SECURITY.md](../SECURITY.md) commits to for the first
       release
 
+Every item above is delivered **through the API**, demonstrated by the
+integration suite and by the `curl` journey in the [README](../README.md).
+
+> **The web interface is not built.** `apps/web` is a README. Each capability
+> listed above can be exercised over HTTP and, for live metrics, over the
+> WebSocket — but a user reading this list would reasonably expect to click
+> rather than curl. v0.1 is not shippable to a non-technical user until the
+> frontend exists, and that is the single largest piece of work remaining.
+>
+> A Kubernetes generator runtime is also outstanding: pools accept
+> `runtime: kubernetes` and the connectivity probe answers honestly that no
+> runtime is implemented for it, but only Docker can actually launch a
+> generator.
+
 ### Explicitly out of v0.1
 
 Written down so nobody assumes otherwise: multi-tenancy, the full RBAC matrix,
