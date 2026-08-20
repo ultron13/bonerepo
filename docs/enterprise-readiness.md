@@ -61,23 +61,37 @@ Kubernetes rollout exercises on every deploy:
 anything is created, provisioning is re-enterable, and ready-or-beyond counts as
 ready. `SIGTERM` finishes the tick in flight and exits clean.
 
-### 4. Authentication has no throttle
+### 4. Authentication has no throttle — closed
 
-`POST /api/v1/auth/login` accepts unlimited attempts. Credential stuffing
-against a deployment with a known seeded administrator is trivial.
+**Fixed:** failed sign-ins are counted per account and per source address, and
+a success clears the account's count. The per-address counter does the real
+work and refuses a correct password too, because working through a list until
+one lands would otherwise still succeed; the per-account one is generous and
+short-lived so a stranger cannot aim it at a colleague.
 
-**Needs:** per-identifier and per-address rate limiting on the auth endpoints,
-and a lockout that cannot be used to lock a legitimate user out.
+### 5. Nothing is observable — closed
 
-### 5. Nothing is observable
+**Fixed:** `/metrics` on the API, and a small server on the worker carrying
+metrics and a liveness probe. The number an alert is built on is when the
+reconciler last completed a pass. Routes are labelled by template, never by
+path, and a test asserts no identifier ever reaches a label.
 
-Structured JSON logs exist and carry a request id. There are no metrics: no
-Prometheus endpoint, no OpenTelemetry, no way to alert on a worker that stopped
-reconciling or a run stuck in `ALLOCATING`. The platform measures other systems
-and cannot measure itself.
+### 5b. Credentials for automation — closed
 
-**Needs:** a metrics endpoint on the API and the worker, and the handful of
-numbers an operator would actually page on.
+Not in the original list because the gap looked like "no API keys". The
+schema was already there and nothing implemented it. **Fixed:** scoped keys,
+hashed, shown once, revocable, with `last_used_at` so a forgotten pipeline can
+be told from a live one. Issuing and revoking take `ADMIN_SYSTEM` — the
+enumeration test caught that both routes had no guard, and the delete route
+would have let any viewer stop every pipeline in the organisation.
+
+### 5c. Generators ran unbounded — closed
+
+Also not in the original list, and worse than most things that were.
+`GeneratorSpec` carried `memory_limit` and `cpu_limit`, the runtime honoured
+them, and nothing set them. **Fixed:** a bounded default, pool-configurable
+sizing, and a JVM heap that follows the container rather than a fixed `-Xmx`
+that would be killed by any pool smaller than a gigabyte.
 
 ### 6. There is no production runtime
 
@@ -111,11 +125,13 @@ gates enterprise pilots.
 
 1. ~~Audit log read API~~ — done
 2. ~~Worker recovery and graceful shutdown~~ — done
-3. Auth rate limiting — the cheapest real attack to close
-4. Observability — metrics and the alerts worth having
-5. Kubernetes runtime and Helm chart
-6. API keys with scopes, then OIDC
-7. The operational edges above
+3. ~~Auth rate limiting~~ — done
+4. ~~Observability~~ — done
+5. ~~API keys with scopes~~ — done
+6. ~~Generator resource limits~~ — done
+7. Kubernetes runtime and Helm chart — the largest remaining item
+8. OIDC, and the multi-tenancy product surface
+9. Backup and restore; `make e2e`; the web interface's missing half
 
 Each is landed the way the rest of this repository was: a failing test first,
 the change, then the gates.
