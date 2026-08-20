@@ -561,7 +561,7 @@ git commit -s -m "feat(api): object storage, reached by presigned URL"
 **Interfaces:**
 - Produces: `stage(run_id, plans, access_for) -> BundleRef(key, sha256)`; the worker stages before it provisions, and records the reference in the run's summary.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `apps/worker/tests/integration/test_bundle.py`:
 
@@ -645,12 +645,12 @@ async def test_an_unreachable_repository_raises() -> None:
         )
 ```
 
-- [ ] **Step 2: Run it to make sure it fails**
+- [x] **Step 2: Run it to make sure it fails**
 
 Run: `uv run pytest apps/worker/tests/integration/test_bundle.py -v -m integration`
 Expected: FAIL — `ModuleNotFoundError: plimsoll_worker.bundle`.
 
-- [ ] **Step 3: Write the bundler**
+- [x] **Step 3: Write the bundler**
 
 `apps/worker/plimsoll_worker/bundle.py`:
 
@@ -733,7 +733,7 @@ async def stage(run_id: uuid.UUID, plans: list[dict[str, Any]]) -> BundleRef:
     return BundleRef(key=key, sha256=digest)
 ```
 
-- [ ] **Step 4: Stage before provisioning**
+- [x] **Step 4: Stage before provisioning**
 
 In `apps/worker/plimsoll_worker/__main__.py`, `_provision` stages the bundle after it wins the `QUEUED → ALLOCATING` transition and before it creates any container, and passes the reference to each agent through the environment:
 
@@ -780,12 +780,12 @@ A staging failure fails the run: wrap the call in the same `try` that already
 fails the run on a provisioning error, so an unreachable repository produces
 `FAILED` with a reason rather than containers with nothing to run.
 
-- [ ] **Step 5: Run the tests and make sure they pass**
+- [x] **Step 5: Run the tests and make sure they pass**
 
 Run: `uv run pytest apps/worker/tests/integration/test_bundle.py -v -m integration`
 Expected: PASS — three tests. If `archive.gzip_mtime` is rejected by this Python's tarfile, drop that line and instead build the gzip layer with `gzip.GzipFile(fileobj=..., mtime=0)` around a `w` mode tar; the determinism test is what tells you which you need.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 make lint && make typecheck && make test
