@@ -22,7 +22,7 @@ A user can:
 - [x] Configure SLA rules
 - [x] Validate the test and see every failure at once, not one at a time
 - [x] Start a run across N generator containers
-- [ ] Watch live metrics stream over WebSocket
+- [x] Watch live metrics stream over WebSocket
 - [x] Stop a run cleanly, idempotently
 - [x] See results with **correctly merged** percentiles
 - [x] See grouped errors with counts and samples

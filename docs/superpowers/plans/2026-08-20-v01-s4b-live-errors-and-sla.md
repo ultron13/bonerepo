@@ -101,23 +101,23 @@ summing counts and widening the first/last seen window.
 **Interfaces:**
 - Produces: `WS /ws/runs/{runId}` emitting `metric`, `generator.status`, and run-terminal events.
 
-- [ ] **Step 1: Write the failing test** — a client subscribed before a run
+- [x] **Step 1: Write the failing test** — a client subscribed before a run
       starts receives windows while it is still running, and a terminal event
       when it ends.
-- [ ] **Step 2: Announce each merged window** from the worker onto the run's
+- [x] **Step 2: Announce each merged window** from the worker onto the run's
       live channel.
-- [ ] **Step 3: Fan out** over the WebSocket, authorised with the ordinary
+- [x] **Step 3: Fan out** over the WebSocket, authorised with the ordinary
       access token and `TEST_READ` — this is a user's socket, not an agent's.
-- [ ] **Step 4: Run everything and commit.**
+- [x] **Step 4: Run everything and commit.**
 
 ---
 
 ## Slice acceptance
 
-- [ ] A window is one row however many generators reported it or times it was delivered
-- [ ] A run carries an SLA verdict per rule, and the run takes the worst
-- [ ] A rule whose metric produced no data is `SKIPPED`, never a pass
-- [ ] A degraded run cannot report a clean pass
-- [ ] `GET /runs/{id}/errors` groups by fingerprint with counts and a bounded sample
-- [ ] A client watching `/ws/runs/{id}` sees windows during the run, not only after
-- [ ] `make dev`, `make lint`, `make typecheck`, `make test`, `make test-int`, and `make contracts` all pass, the last leaving the tree clean
+- [x] A window is one row however many generators reported it or times it was delivered
+- [x] A run carries an SLA verdict per rule, and the run takes the worst
+- [x] A rule whose metric produced no data is `SKIPPED`, never a pass
+- [x] A degraded run cannot report a clean pass
+- [x] `GET /runs/{id}/errors` groups by fingerprint with counts and a bounded sample
+- [x] A client watching `/ws/runs/{id}` sees windows during the run, not only after
+- [x] `make dev`, `make lint`, `make typecheck`, `make test`, `make test-int`, and `make contracts` all pass, the last leaving the tree clean
