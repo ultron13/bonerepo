@@ -88,3 +88,48 @@ def test_a_stopping_run_waits_for_its_generators() -> None:
 def test_a_terminal_run_needs_nothing() -> None:
     for status in ("COMPLETED", "FAILED", "CANCELLED"):
         assert decide(_view(status, [_generator(0, "COMPLETED")])) is Decision.DONE
+
+
+def test_a_run_abandoned_mid_provision_is_provisioned_again() -> None:
+    """A worker that died between claiming the run and finishing it.
+
+    The run reached ALLOCATING and some ordinal never got a container. Waiting
+    is the one thing that cannot be right: nothing else moves an ALLOCATING run
+    on, so it would sit there for the life of the deployment while its
+    containers -- if any were made -- ran unattended.
+    """
+    view = _view("ALLOCATING", [_generator(0, "PENDING"), _generator(1, "PENDING")])
+    assert decide(view) is Decision.PROVISION
+
+
+def test_a_partly_provisioned_run_is_provisioned_again() -> None:
+    """One ordinal has a container and the other does not: the gap is what
+    provisioning is for, and it is safe to re-enter because an ordinal that
+    already has one is skipped."""
+    view = _view("ALLOCATING", [_generator(0, "PROVISIONED"), _generator(1, "PENDING")])
+    assert decide(view) is Decision.PROVISION
+
+
+def test_a_fully_provisioned_run_is_left_alone() -> None:
+    """Already covered elsewhere, restated here so the two cases sit together:
+    every ordinal has a container, so there is nothing to provision."""
+    view = _view("ALLOCATING", [_generator(0, "PROVISIONED"), _generator(1, "PROVISIONED")])
+    assert decide(view) is Decision.WAIT
+
+
+def test_a_generator_already_running_still_starts_the_run() -> None:
+    """After a recovery, a generator can be further along than the run.
+
+    Its container survived, its agent was already told to start, and the run
+    was put back to STARTING. Requiring exactly READY would leave the run there
+    for ever waiting for a state that has already been passed.
+    """
+    view = _view("STARTING", [_generator(0, "READY"), _generator(1, "RUNNING")])
+    assert decide(view) is Decision.START
+
+
+def test_a_generator_still_fetching_does_not_start_the_run() -> None:
+    """The staggered-start guard is unchanged: further along is fine, short of
+    ready is not."""
+    view = _view("STARTING", [_generator(0, "RUNNING"), _generator(1, "FETCHING")])
+    assert decide(view) is Decision.WAIT

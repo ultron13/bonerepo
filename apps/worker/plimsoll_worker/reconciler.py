@@ -21,6 +21,9 @@ from plimsoll_contracts.runs import (
 
 HEARTBEAT_TIMEOUT = timedelta(seconds=35)
 
+# What counts as ready to start: at the line, or already past it.
+STARTED_OR_READY = frozenset({GeneratorStatus.READY, GeneratorStatus.RUNNING})
+
 
 class Decision(Enum):
     PROVISION = auto()
@@ -82,6 +85,19 @@ def decide(view: RunView) -> Decision:
     if view.status == RunStatus.QUEUED:
         return Decision.PROVISION
 
+    # A run that reached ALLOCATING and still has an ordinal without a
+    # container was abandoned part-way through provisioning -- a worker that
+    # died between creating containers and recording them, or before creating
+    # them at all. Nothing else moves an ALLOCATING run on, so waiting would
+    # leave it there for the life of the deployment while any containers it did
+    # make ran unattended. Provisioning is safe to re-enter: an ordinal that
+    # already has one is skipped, and one whose container exists but was never
+    # recorded is adopted rather than made twice.
+    if view.status == RunStatus.ALLOCATING and any(
+        generator.external_ref is None for generator in view.generators
+    ):
+        return Decision.PROVISION
+
     if any(is_silent(generator, view.now) for generator in view.generators):
         return Decision.MARK_LOST
 
@@ -102,8 +118,13 @@ def decide(view: RunView) -> Decision:
     if not live:
         return Decision.FINISH
 
+    # Ready or beyond. A generator that is already RUNNING got its start from
+    # an earlier incarnation of this run -- its container survived a worker
+    # that did not -- and requiring exactly READY would wait for a state it has
+    # already passed. Short of ready still waits, which is what keeps a
+    # staggered start from smearing the ramp.
     if view.status == RunStatus.STARTING and all(
-        generator.status == GeneratorStatus.READY for generator in live
+        generator.status in STARTED_OR_READY for generator in live
     ):
         return Decision.START
 

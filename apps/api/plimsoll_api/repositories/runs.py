@@ -210,6 +210,24 @@ async def attach_external_ref(
     )
 
 
+async def record_external_ref(
+    session: AsyncSession, run_id: uuid.UUID, ordinal: int, external_ref: str
+) -> None:
+    """Attach a reference without touching the status.
+
+    Adoption records a container that already exists; the generator inside it
+    may be further along than provisioned, and saying otherwise walks its
+    lifecycle backwards into a state the run can never leave.
+    """
+    await session.execute(
+        sa.text(
+            "UPDATE run_generators SET external_ref = :ref "
+            "WHERE run_id = :run AND ordinal = :ordinal AND external_ref IS NULL"
+        ),
+        {"run": run_id, "ordinal": ordinal, "ref": external_ref},
+    )
+
+
 async def set_generator_status(
     session: AsyncSession,
     run_id: uuid.UUID,

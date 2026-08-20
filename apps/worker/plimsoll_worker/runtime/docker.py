@@ -11,6 +11,7 @@ blocking the loop that is also serving heartbeats.
 from __future__ import annotations
 
 import asyncio
+import uuid
 from typing import Any, cast
 
 import docker
@@ -30,7 +31,13 @@ class DockerRuntime:
             name=f"plimsoll-gen-{spec.run_id}-{spec.ordinal}",
             network=spec.network,
             environment=spec.environment,
-            labels={**spec.labels, "plimsoll.run": str(spec.run_id)},
+            # The run and the ordinal both, so a container can be traced back
+            # to the row that should describe it without parsing its name.
+            labels={
+                **spec.labels,
+                "plimsoll.run": str(spec.run_id),
+                "plimsoll.ordinal": str(spec.ordinal),
+            },
             # Invariant 6. A lost generator is capacity loss and must surface as
             # such, never be papered over by a restart. Docker documents "no" as
             # the name that disables restarting; the stubs list only the names
@@ -57,6 +64,29 @@ class DockerRuntime:
             await self.teardown(handles)
             raise
         return handles
+
+    def _find(self, run_id: uuid.UUID) -> list[GeneratorHandle]:
+        containers = self._client.containers.list(
+            all=True, filters={"label": f"plimsoll.run={run_id}"}
+        )
+        found = []
+        for container in containers:
+            ordinal = container.labels.get("plimsoll.ordinal")
+            if ordinal is None:
+                continue
+            found.append(GeneratorHandle(ordinal=int(ordinal), external_ref=str(container.id)))
+        return sorted(found, key=lambda handle: handle.ordinal)
+
+    async def find_by_run(self, run_id: uuid.UUID) -> list[GeneratorHandle]:
+        """What this run actually has, asked of the runtime rather than the
+        database.
+
+        The two disagree exactly when it matters: a worker that died between
+        creating a container and recording it leaves one the database has never
+        heard of. Nothing reaps it, and because names are deterministic, the
+        next attempt collides with it and the run cannot recover either.
+        """
+        return await asyncio.to_thread(self._find, run_id)
 
     def _inspect(self, handle: GeneratorHandle) -> GeneratorState:
         try:

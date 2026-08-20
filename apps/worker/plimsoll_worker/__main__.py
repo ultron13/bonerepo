@@ -10,8 +10,10 @@ import asyncio
 import contextlib
 import logging
 import os
+import signal
 import socket
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -60,6 +62,10 @@ PROBE_BLOCK_MS = 2000
 # written, so a wider read is fewer round trips and a better merge.
 METRICS_BLOCK_MS = 2000
 METRICS_BATCH = 500
+# Kubernetes sends SIGTERM and then kills, by default thirty seconds later. The
+# loops finish the tick they are in and stop; anything longer than this and the
+# kill arrives first, which is the case adoption exists to survive.
+SHUTDOWN_GRACE_SECONDS = 20
 # How much longer than the run an agent's credential stays valid. It covers
 # provisioning, the ramp, and the wind-down; it is not a licence to outlive the
 # run by any margin that matters.
@@ -153,13 +159,26 @@ class Orchestrator:
 
     async def _provision(self, run: sa.Row[Any], org_id: uuid.UUID, view: RunView) -> None:
         async with session_for_org(org_id) as session:
+            # ALLOCATING as well as QUEUED: re-entering is how a run
+            # abandoned part-way through recovers, and the conditional update
+            # still refuses a second worker running concurrently.
             moved = await repo.transition(
-                session, run.id, expected=[RunStatus.QUEUED], to=RunStatus.ALLOCATING
+                session,
+                run.id,
+                expected=[RunStatus.QUEUED, RunStatus.ALLOCATING],
+                to=RunStatus.ALLOCATING,
             )
         if moved is None:
-            # Another worker took it. Provisioning twice is exactly the failure
-            # at-least-once delivery invites, and this is where it is refused.
+            # Another worker took it, or it has already moved past allocation.
+            # Provisioning twice is exactly the failure at-least-once delivery
+            # invites, and this is where it is refused.
             return
+
+        # Before anything is created: a previous attempt may have made
+        # containers and died before recording them. Adopting them makes the
+        # rows describe what exists, which is what lets them be torn down and
+        # what stops this attempt colliding with their deterministic names.
+        adopted = await self._adopt_orphans(run.id, org_id, view)
 
         image = run.configuration_snapshot.get("image") or await self._pool_image(run, org_id)
         ttl = view.duration_seconds + GRACE_SECONDS
@@ -197,7 +216,7 @@ class Orchestrator:
             # An ordinal that already carries a container is never given a
             # second one, so a retried provision fills only the gaps.
             for generator in view.generators
-            if generator.external_ref is None
+            if generator.external_ref is None and generator.ordinal not in adopted
         ]
 
         try:
@@ -214,6 +233,34 @@ class Orchestrator:
             await repo.transition(
                 session, run.id, expected=[RunStatus.ALLOCATING], to=RunStatus.STARTING
             )
+
+    async def _adopt_orphans(self, run_id: uuid.UUID, org_id: uuid.UUID, view: RunView) -> set[int]:
+        """Record containers this run already has that no row describes.
+
+        A worker that died between creating a container and writing its
+        reference left one the database never heard of: nothing reaps it, and
+        the next attempt collides with its name. Graceful shutdown does not
+        help here -- a SIGKILL, an OOM, or a lost node all produce the same
+        orphan -- so recovery reads the runtime rather than trusting that the
+        last write happened.
+
+        Returns the ordinals that were adopted.
+        """
+        known = {row.ordinal for row in view.generators if row.external_ref is not None}
+        existing = await self._runtime.find_by_run(run_id)
+        orphans = [handle for handle in existing if handle.ordinal not in known]
+        if not orphans:
+            return set()
+
+        logger.warning(
+            "run %s has %d container(s) no row describes; adopting them",
+            run_id,
+            len(orphans),
+        )
+        async with session_for_org(org_id) as session:
+            for handle in orphans:
+                await repo.record_external_ref(session, run_id, handle.ordinal, handle.external_ref)
+        return {handle.ordinal for handle in orphans}
 
     async def _stage(self, run: sa.Row[Any], org_id: uuid.UUID) -> BundleRef:
         """Git access is assembled inside a transaction; the fetch happens
@@ -353,7 +400,7 @@ class Orchestrator:
 
 
 async def _reconcile_forever(
-    bus: RedisStreamBus, orchestrator: Orchestrator, consumer: str
+    bus: RedisStreamBus, orchestrator: Orchestrator, consumer: str, stopping: asyncio.Event
 ) -> None:
     """One run's message is acknowledged only when that run is finished with.
 
@@ -363,7 +410,7 @@ async def _reconcile_forever(
     """
     tracked: dict[uuid.UUID, tuple[uuid.UUID, Delivery]] = {}
 
-    while True:
+    while not stopping.is_set():
         deliveries = await bus.read(RUNS_EXECUTION, WORKER_GROUP, consumer, count=10, block_ms=1000)
         deliveries += await bus.reclaim_stale(
             RUNS_EXECUTION, WORKER_GROUP, consumer, idle=RECLAIM_AFTER
@@ -386,17 +433,26 @@ async def _reconcile_forever(
                 await bus.acknowledge(RUNS_EXECUTION, WORKER_GROUP, delivery)
                 del tracked[run_id]
 
-        await asyncio.sleep(TICK_SECONDS)
+        # A tick is never abandoned half-done: the sleep is what gets cut
+        # short, so a reconciliation in flight always finishes.
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(stopping.wait(), timeout=TICK_SECONDS)
+
+    logger.info(
+        "reconciler stopped; %d run(s) left unacknowledged for the next worker", len(tracked)
+    )
 
 
-async def _serve_probes(bus: RedisStreamBus, orchestrator: Orchestrator, consumer: str) -> None:
+async def _serve_probes(
+    bus: RedisStreamBus, orchestrator: Orchestrator, consumer: str, stopping: asyncio.Event
+) -> None:
     """Answer pool diagnostics on their own task.
 
     The API blocks a request on this, so a probe must not wait behind a tick's
     worth of reconciliation. A probe is acknowledged once answered; an
     unanswered one is better retried than lost.
     """
-    while True:
+    while not stopping.is_set():
         deliveries = await bus.read(
             POOL_PROBES, WORKER_GROUP, consumer, count=5, block_ms=PROBE_BLOCK_MS
         )
@@ -417,7 +473,7 @@ async def _serve_probes(bus: RedisStreamBus, orchestrator: Orchestrator, consume
             await bus.acknowledge(POOL_PROBES, WORKER_GROUP, delivery)
 
 
-async def _ingest_metrics(bus: RedisStreamBus, consumer: str) -> None:
+async def _ingest_metrics(bus: RedisStreamBus, consumer: str, stopping: asyncio.Event) -> None:
     """Merge sketches and write them, on its own task.
 
     Measurement is not execution: a batch that cannot be written is
@@ -425,7 +481,7 @@ async def _ingest_metrics(bus: RedisStreamBus, consumer: str) -> None:
     run that generated load and lost a window is degraded reporting, not a
     failed test.
     """
-    while True:
+    while not stopping.is_set():
         deliveries = await bus.read(
             METRICS_INGESTION,
             METRICS_GROUP,
@@ -480,6 +536,35 @@ async def _ingest_metrics(bus: RedisStreamBus, consumer: str) -> None:
             await bus.acknowledge(METRICS_INGESTION, METRICS_GROUP, delivery)
 
 
+def _stop(stopping: asyncio.Event, received: signal.Signals) -> Callable[[], None]:
+    def handler() -> None:
+        if stopping.is_set():
+            return
+        logger.info("%s received; finishing the current tick", received.name)
+        stopping.set()
+
+    return handler
+
+
+async def _drain(work: asyncio.Future[Any], stopping: asyncio.Event) -> None:
+    """Give the loops the grace period, then stop waiting.
+
+    Waiting forever would turn a graceful stop into a hang, and the kill that
+    follows is exactly the abrupt end this is trying to avoid.
+    """
+    stopping.set()
+    try:
+        await asyncio.wait_for(asyncio.shield(work), timeout=SHUTDOWN_GRACE_SECONDS)
+    except TimeoutError:
+        logger.warning("loops did not stop within %ds; exiting anyway", SHUTDOWN_GRACE_SECONDS)
+    except asyncio.CancelledError:
+        pass
+    finally:
+        work.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await work
+
+
 async def main() -> None:
     configure_logging(get_settings().log_level)
     # Here rather than in a migration or a setup script, so `make dev` needs no
@@ -491,14 +576,28 @@ async def main() -> None:
     await bus.ensure_group(METRICS_INGESTION, METRICS_GROUP)
     orchestrator = Orchestrator()
     consumer = f"worker-{socket.gethostname()}"
+    # SIGTERM is how an orchestrator asks a process to stop, and how a
+    # `docker stop` begins. Setting an event rather than raising lets each loop
+    # finish the tick it is in: an abandoned reconciliation is the case that
+    # leaves containers nothing has recorded.
+    stopping = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for received in (signal.SIGTERM, signal.SIGINT):
+        with contextlib.suppress(NotImplementedError):
+            loop.add_signal_handler(received, _stop(stopping, received))
+
     # Three loops, one process: a long reconciliation must never delay a probe,
     # a probe must never delay a run, and a burst of metrics must delay
     # neither.
-    await asyncio.gather(
-        _reconcile_forever(bus, orchestrator, consumer),
-        _serve_probes(bus, orchestrator, consumer),
-        _ingest_metrics(bus, consumer),
+    work = asyncio.gather(
+        _reconcile_forever(bus, orchestrator, consumer, stopping),
+        _serve_probes(bus, orchestrator, consumer, stopping),
+        _ingest_metrics(bus, consumer, stopping),
     )
+    try:
+        await asyncio.wait_for(work, timeout=None if not stopping.is_set() else 0)
+    finally:
+        await _drain(work, stopping)
 
 
 if __name__ == "__main__":

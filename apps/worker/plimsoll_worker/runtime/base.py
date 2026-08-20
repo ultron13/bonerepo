@@ -37,6 +37,15 @@ class GeneratorState:
 class GeneratorRuntime(Protocol):
     async def provision(self, specs: list[GeneratorSpec]) -> list[GeneratorHandle]: ...
 
+    async def find_by_run(self, run_id: uuid.UUID) -> list[GeneratorHandle]:
+        """What this run has, according to the runtime rather than the database.
+
+        Part of the interface rather than a Docker convenience: any runtime has
+        the same gap between creating a generator and recording it, and any
+        implementation has to be able to close it.
+        """
+        ...
+
     async def status(self, handles: list[GeneratorHandle]) -> list[GeneratorState]: ...
 
     async def teardown(self, handles: list[GeneratorHandle]) -> None: ...
