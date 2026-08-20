@@ -82,16 +82,28 @@ lifecycle:
    ([script repositories](07-script-repos.md)). Plugins named in the manifest
    must already be present in the generator image or the organisation's plugin
    mirror — the agent never downloads plugins from the internet at run time.
+
+   The archive is packed deterministically and its SHA-256 recorded on the run
+   alongside the commit SHAs. The agent checks the digest before unpacking, so
+   "every generator ran the same bytes" is a fact the run can state rather than
+   an assumption it relies on.
 3. **Resolve secrets** — variables injected in memory, never written to disk.
 4. **Verify the target** against the policy a second time, immediately before
-   traffic starts.
+   traffic starts. The hosts are read out of the plan the agent is holding, not
+   from a list recorded earlier: a remembered list and the plan about to run are
+   exactly the two things that drift apart, and the drift favours the attacker.
+   The check rejects and the generator exits; it never warns.
 5. **Run JMeter** headless:
    `jmeter -n -t <plan>.jmx -l results.jtl -Jthreads=<n> -Jrampup=<s> -Jduration=<s>`
    Workload parameters are passed as properties; the plan is never rewritten.
 6. **Stream measurements** — tail the JTL sample stream, fold into HDR
    histograms, ship sketches. See [the metrics pipeline](03-metrics-pipeline.md).
 7. **Heartbeat** every 10 seconds over the control channel.
-8. **Upload artifacts** — raw JTL, JMeter logs, and errors to object storage.
+8. **Upload artifacts** — raw JTL and JMeter logs to object storage, through
+   presigned `PUT` URLs the control plane signs one at a time. The key is built
+   from the agent's own token, never from the name it sends, so a generator
+   cannot write outside its own prefix. A failed upload is a warning, not a
+   lost run.
 9. **Report terminal state** and exit.
 
 Agent states: `STARTING → FETCHING → READY → RUNNING → STOPPING → COMPLETED`,

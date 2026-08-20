@@ -198,6 +198,27 @@ never restarted and never quietly ignored: the run is failed, or marked
 `degraded`, because a result produced with less load than planned must not pass
 as a full one.
 
+### Take the results away
+
+A finished run leaves the raw JMeter results and the engine's log in object
+storage. The list names them; the download answers `302` to a short-lived
+signed URL rather than streaming a large file through the control plane:
+
+```bash
+curl -s -H "$AUTH" "http://localhost:8000/api/v1/runs/$RUN/artifacts" \
+  | jq '.items[] | {name, size}'
+
+curl -sL -H "$AUTH" \
+  "http://localhost:8000/api/v1/runs/$RUN/artifacts/results.jtl" -o results.jtl
+head -2 results.jtl
+```
+
+That JTL is ordinary JMeter output — every sample, with its timestamp, elapsed
+time, label, and result — so it opens in any tool that already reads one.
+Percentiles are not computed from it per generator and averaged: that is the
+mistake this project exists to avoid, and merging happens once, from HDR
+sketches, in a later slice.
+
 Locally, generators are Docker containers. In production the same image runs as
 Kubernetes pods. Only the launcher differs — see
 [ADR-0003](docs/adr/0003-kubernetes-native-generators.md). To check that a pool

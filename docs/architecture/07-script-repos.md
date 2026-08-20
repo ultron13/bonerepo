@@ -70,6 +70,32 @@ Rules:
   secret store at run start and are injected in memory
   ([security](05-security.md)). A manifest containing a credential fails
   verification.
+- **A plan must bridge properties to variables itself.** Values arrive as
+  JMeter *properties* (`-JAPI_HOST=...`), because the plan is never rewritten
+  ([ADR-0006](../adr/0006-jmeter-first-executor.md)) and a property is the only
+  thing that can be set from outside a `.jmx`. JMeter keeps properties and
+  variables in separate namespaces, so `${API_HOST}` does **not** read a
+  property of that name. Declare a User Defined Variables element that reads
+  it:
+
+  ```xml
+  <Arguments guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+    <collectionProp name="Arguments.arguments">
+      <elementProp name="API_HOST" elementType="Argument">
+        <stringProp name="Argument.name">API_HOST</stringProp>
+        <stringProp name="Argument.value">${__P(API_HOST,)}</stringProp>
+        <stringProp name="Argument.metadata">=</stringProp>
+      </elementProp>
+    </collectionProp>
+  </Arguments>
+  ```
+
+  Without it the reference resolves to empty and the sampler fails at run time
+  rather than at verification, which is the worst place to find out. The same
+  applies to the workload: `num_threads` reads `${__P(threads,10)}`, and a
+  thread group that hard-codes its count ignores the workload the operator
+  configured. The demo plan in `images/script-fixture/repo/perf/checkout.jmx`
+  is the worked example.
 - **Plugins pin a version and a checksum.** An unpinned plugin is a
   supply-chain hole and an unreproducible run.
 - **`distribution` defaults to `shared`.** `partitioned` and `unique` ship

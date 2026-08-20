@@ -202,9 +202,21 @@ POST /runs/{id}/cancel
 GET  /runs/{id}/metrics         # later slice
 GET  /runs/{id}/transactions    # later slice
 GET  /runs/{id}/errors          # later slice
+GET  /runs/{id}/artifacts
+GET  /runs/{id}/artifacts/{name}
+
 GET  /runs/{id}/generators      # later slice
-GET  /runs/{id}/artifacts       # later slice
 ```
+
+`GET /runs/{id}/artifacts` lists what a run left behind — the raw JTL and the
+JMeter log for each generator, with sizes. `GET /runs/{id}/artifacts/{name}`
+answers `302` to a short-lived presigned URL rather than streaming the bytes
+through the control plane: a JTL is large, and proxying it would tie up an API
+worker for the length of the transfer.
+
+Both need only `TEST_READ`. Authorisation is checked against the run row, never
+against the object store, which knows nothing about tenancy — and the response
+can only name an object that already exists under that run's prefix.
 
 `POST /tests/{id}/runs` runs preflight first and refuses the whole run rather
 than starting one that cannot finish. A test that is not runnable answers `422`
