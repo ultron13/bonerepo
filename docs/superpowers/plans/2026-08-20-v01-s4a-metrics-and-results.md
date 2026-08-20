@@ -638,28 +638,28 @@ produce one row whose sketch is the sum of theirs.
 **Interfaces:**
 - Produces: `GET /api/v1/runs/{id}/metrics` returning per-transaction `count`, `errorCount`, `min`, `max`, `mean`, `p50`, `p90`, `p95`, `p99`, and throughput.
 
-- [ ] **Step 1: Write the failing test** — a completed run answers a summary
+- [x] **Step 1: Write the failing test** — a completed run answers a summary
       whose percentiles are derived from merged sketches, and whose p95 for a
       transaction lies between that transaction's min and max.
-- [ ] **Step 2: Write the repository** — select rows for a run, grouped by
+- [x] **Step 2: Write the repository** — select rows for a run, grouped by
       transaction, returning the sketches to merge. **The SQL never computes a
       percentile.**
-- [ ] **Step 3: Write the service** — merge the sketches for each transaction
+- [x] **Step 3: Write the service** — merge the sketches for each transaction
       once and derive every percentile from that one merged histogram.
-- [ ] **Step 4: Write the endpoint**, `TEST_READ`, and regenerate contracts.
-- [ ] **Step 5: Run everything and commit.**
+- [x] **Step 4: Write the endpoint**, `TEST_READ`, and regenerate contracts.
+- [x] **Step 5: Run everything and commit.**
 
 ---
 
 ## Slice acceptance
 
-- [ ] A completed run answers `GET /runs/{id}/metrics` with per-transaction percentiles
-- [ ] Percentiles are derived from merged sketches — no code path averages one, and a test demonstrates the error that would cause
-- [ ] Two generators reporting the same window produce one row, not two
-- [ ] `organization_id` on a metric row comes from the run, never from the agent
-- [ ] The agent holds no Redis credential
-- [ ] A run whose metrics fail still completes and still reports its artifacts
-- [ ] `make dev`, `make lint`, `make typecheck`, `make test`, `make test-int`, and `make contracts` all pass, the last leaving the tree clean
+- [x] A completed run answers `GET /runs/{id}/metrics` with per-transaction percentiles
+- [x] Percentiles are derived from merged sketches — no code path averages one, and a test demonstrates the error that would cause
+- [x] Two generators reporting the same window produce one row, not two
+- [x] `organization_id` on a metric row comes from the run, never from the agent
+- [x] The agent holds no Redis credential
+- [x] A run whose metrics fail still completes and still reports its artifacts
+- [x] `make dev`, `make lint`, `make typecheck`, `make test`, `make test-int`, and `make contracts` all pass, the last leaving the tree clean
 
 ## Known limitation carried into S4b
 
