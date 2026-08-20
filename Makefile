@@ -4,7 +4,8 @@ UV := uv run
 COMPOSE := docker compose -f infrastructure/docker/docker-compose.yml
 
 test:
-	$(UV) pytest apps/api/tests/unit apps/worker/tests/unit apps/agent/tests/unit -v
+	$(UV) pytest apps/api/tests/unit apps/worker/tests/unit apps/agent/tests/unit \
+	  packages/executor-sdk/tests -v
 
 lint:
 	$(UV) ruff check .

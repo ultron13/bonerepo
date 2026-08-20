@@ -1,0 +1,14 @@
+[project]
+name = "plimsoll-executor-sdk"
+version = "0.1.0"
+requires-python = ">=3.12"
+# No dependencies at all. The seam has to be light enough that a second
+# executor is a package, not a project.
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["plimsoll_executor"]

@@ -13,6 +13,7 @@ members = [
     "plimsoll-agent",
     "plimsoll-api",
     "plimsoll-contracts",
+    "plimsoll-executor-sdk",
     "plimsoll-worker",
 ]
 
@@ -978,6 +979,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "plimsoll-api" },
     { name = "plimsoll-contracts" },
+    { name = "plimsoll-executor-sdk" },
     { name = "plimsoll-worker" },
 ]
 
@@ -1000,6 +1002,7 @@ dev = [
 requires-dist = [
     { name = "plimsoll-api", editable = "apps/api" },
     { name = "plimsoll-contracts", editable = "packages/contracts/python" },
+    { name = "plimsoll-executor-sdk", editable = "packages/executor-sdk" },
     { name = "plimsoll-worker", editable = "apps/worker" },
 ]
 
@@ -1025,6 +1028,7 @@ source = { editable = "apps/agent" }
 dependencies = [
     { name = "httpx" },
     { name = "plimsoll-contracts" },
+    { name = "plimsoll-executor-sdk" },
     { name = "websockets" },
 ]
 
@@ -1032,6 +1036,7 @@ dependencies = [
 requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "plimsoll-contracts", editable = "packages/contracts/python" },
+    { name = "plimsoll-executor-sdk", editable = "packages/executor-sdk" },
     { name = "websockets", specifier = ">=14" },
 ]
 
@@ -1090,6 +1095,11 @@ requires-dist = [
     { name = "email-validator", specifier = ">=2.1" },
     { name = "pydantic", specifier = ">=2.7" },
 ]
+
+[[package]]
+name = "plimsoll-executor-sdk"
+version = "0.1.0"
+source = { editable = "packages/executor-sdk" }
 
 [[package]]
 name = "plimsoll-worker"

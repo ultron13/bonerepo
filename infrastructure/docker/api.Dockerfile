@@ -17,6 +17,7 @@ COPY apps/worker/pyproject.toml apps/worker/
 # control plane never carries the code that runs beside a customer's plan.
 COPY apps/agent/pyproject.toml apps/agent/
 COPY packages/contracts/python/pyproject.toml packages/contracts/python/
+COPY packages/executor-sdk/pyproject.toml packages/executor-sdk/
 # Third-party dependencies only. The workspace packages must be skipped here:
 # their source is not copied yet, so an editable build would record a wheel
 # with no path hook and the later sync would consider them already installed.

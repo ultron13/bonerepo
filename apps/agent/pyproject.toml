@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 # no database driver, no key provider, and no object-store client.
 dependencies = [
     "plimsoll-contracts",
+    "plimsoll-executor-sdk",
     "websockets>=14",
     "httpx>=0.27",
 ]

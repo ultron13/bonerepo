@@ -9,16 +9,24 @@ dependencies = [
     "plimsoll-api",
     "plimsoll-contracts",
     "plimsoll-worker",
+    "plimsoll-executor-sdk",
 ]
 
 [tool.uv.workspace]
-members = ["apps/api", "apps/worker", "apps/agent", "packages/contracts/python"]
+members = [
+    "apps/api",
+    "apps/worker",
+    "apps/agent",
+    "packages/contracts/python",
+    "packages/executor-sdk",
+]
 
 [tool.uv.sources]
 plimsoll-api = { workspace = true }
 plimsoll-contracts = { workspace = true }
 plimsoll-worker = { workspace = true }
 plimsoll-agent = { workspace = true }
+plimsoll-executor-sdk = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -63,6 +71,7 @@ known-first-party = [
     "plimsoll_contracts",
     "plimsoll_worker",
     "plimsoll_agent",
+    "plimsoll_executor",
 ]
 
 [tool.mypy]
@@ -78,5 +87,10 @@ mypy_path = ["images/demo-target"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["apps/api/tests", "apps/worker/tests", "apps/agent/tests"]
+testpaths = [
+    "apps/api/tests",
+    "apps/worker/tests",
+    "apps/agent/tests",
+    "packages/executor-sdk/tests",
+]
 markers = ["integration: requires the make dev stack"]
