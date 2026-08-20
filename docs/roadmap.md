@@ -12,28 +12,29 @@ One narrow path, complete and demonstrable.
 
 A user can:
 
-- [ ] Log in (single organisation, `ADMIN` and `VIEWER` only)
-- [ ] Create a project
-- [ ] Connect a Git repository and verify credentials
-- [ ] Verify the repository against its `plimsoll.yaml` manifest — or inferred
+- [x] Log in (single organisation, `ADMIN` and `VIEWER` only)
+- [x] Create a project
+- [x] Connect a Git repository and verify credentials
+- [x] Verify the repository against its `plimsoll.yaml` manifest — or inferred
       defaults for a bare `.jmx` repo ([script repositories](architecture/07-script-repos.md))
-- [ ] Pin a `.jmx` plan to a resolved commit SHA
-- [ ] Define a performance test — virtual users, duration, linear ramp
-- [ ] Configure SLA rules
-- [ ] Validate the test and see every failure at once, not one at a time
-- [ ] Start a run across N generator containers
+- [x] Pin a `.jmx` plan to a resolved commit SHA
+- [x] Define a performance test — virtual users, duration, linear ramp
+- [x] Configure SLA rules
+- [x] Validate the test and see every failure at once, not one at a time
+- [x] Start a run across N generator containers
 - [ ] Watch live metrics stream over WebSocket
-- [ ] Stop a run cleanly, idempotently
+- [x] Stop a run cleanly, idempotently
 - [ ] See results with **correctly merged** percentiles
 - [ ] See grouped errors with counts and samples
 - [ ] See SLA pass/fail per rule
-- [ ] Download raw run artifacts
+- [x] Download raw run artifacts
 
 And an operator can:
 
-- [ ] Configure a target allowlist, without which no run starts
-- [ ] Create a generator pool for Docker or Kubernetes
-- [ ] Run everything with `make dev` on a machine that has only Docker
+- [x] Configure a target allowlist, without which no run starts
+- [x] Create a generator pool for Docker — Kubernetes pools are defined and
+      probed, but no Kubernetes runtime exists behind them yet
+- [x] Run everything with `make dev` on a machine that has only Docker
 - [ ] Read a published version support policy — which versions get fixes and
       for how long, as [SECURITY.md](../SECURITY.md) commits to for the first
       release
