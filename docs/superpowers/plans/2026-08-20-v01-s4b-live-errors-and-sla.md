@@ -82,12 +82,12 @@ A million failures are one problem repeated. The agent folds them by
 fingerprint and ships counts with a bounded sample; the worker upserts,
 summing counts and widening the first/last seen window.
 
-- [ ] **Step 1: Write the failing test** — a fingerprint is stable across
+- [x] **Step 1: Write the failing test** — a fingerprint is stable across
       varying numbers and identifiers in a message, so the same fault groups
       even when its text differs.
-- [ ] **Step 2: Write the fingerprint and the folder.**
-- [ ] **Step 3: Ship, upsert, and expose.**
-- [ ] **Step 4: Run everything and commit.**
+- [x] **Step 2: Write the fingerprint and the folder.**
+- [x] **Step 3: Ship, upsert, and expose.**
+- [x] **Step 4: Run everything and commit.**
 
 ---
 

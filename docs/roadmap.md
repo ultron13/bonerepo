@@ -25,7 +25,7 @@ A user can:
 - [ ] Watch live metrics stream over WebSocket
 - [x] Stop a run cleanly, idempotently
 - [x] See results with **correctly merged** percentiles
-- [ ] See grouped errors with counts and samples
+- [x] See grouped errors with counts and samples
 - [x] See SLA pass/fail per rule
 - [x] Download raw run artifacts
 
