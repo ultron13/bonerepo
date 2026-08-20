@@ -22,7 +22,7 @@ async def insert(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
-    created_by: uuid.UUID,
+    created_by: uuid.UUID | None,
     name: str,
     project_key: str,
     description: str | None,

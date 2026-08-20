@@ -31,7 +31,7 @@ async def insert(
     *,
     org_id: uuid.UUID,
     project_id: uuid.UUID,
-    created_by: uuid.UUID,
+    created_by: uuid.UUID | None,
     name: str,
     description: str | None,
     configuration: dict[str, Any],

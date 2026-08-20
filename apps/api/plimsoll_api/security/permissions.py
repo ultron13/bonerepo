@@ -12,6 +12,7 @@ from enum import StrEnum
 
 from plimsoll_api.dependencies import CurrentPrincipal
 from plimsoll_api.errors import PlimsollError
+from plimsoll_api.security.tokens import AccessClaims
 from plimsoll_contracts.errors import ErrorCode
 
 
@@ -41,9 +42,23 @@ def permissions_for(role: str) -> frozenset[Permission]:
     return ROLE_PERMISSIONS.get(role, frozenset())
 
 
+def held_by(principal: AccessClaims) -> frozenset[Permission]:
+    """What this principal may do.
+
+    A key's scopes replace its role rather than adding to it. Reading both
+    would make a scoped key as powerful as the person who created it, which is
+    the whole thing scopes exist to prevent.
+    """
+    if principal.scopes is not None:
+        return frozenset(
+            permission for permission in Permission if permission.value in principal.scopes
+        )
+    return permissions_for(principal.role)
+
+
 def requires(permission: Permission) -> Callable[..., None]:
     def guard(principal: CurrentPrincipal) -> None:
-        if permission not in permissions_for(principal.role):
+        if permission not in held_by(principal):
             raise PlimsollError(
                 ErrorCode.PERMISSION_DENIED,
                 f"This action requires the {permission} permission.",

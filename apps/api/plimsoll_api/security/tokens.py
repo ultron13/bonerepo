@@ -17,9 +17,22 @@ class TokenError(Exception):
 
 @dataclass(frozen=True)
 class AccessClaims:
-    user_id: uuid.UUID
+    """Who is acting, however they proved it.
+
+    A key has no user behind it, so `user_id` is absent and `api_key_id` names
+    the key instead -- an audit trail that attributed a pipeline's actions to
+    whoever happened to mint its credential would be worse than one that said
+    nothing.
+
+    `scopes`, when present, replaces the role entirely. A key holds exactly
+    what it was granted, and a role's permissions are not consulted for it.
+    """
+
+    user_id: uuid.UUID | None
     organization_id: uuid.UUID
     role: str
+    api_key_id: uuid.UUID | None = None
+    scopes: frozenset[str] | None = None
 
 
 def issue_access_token(user_id: uuid.UUID, org_id: uuid.UUID, role: str) -> str:

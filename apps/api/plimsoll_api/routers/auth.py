@@ -99,6 +99,12 @@ async def logout(response: Response) -> None:
 
 @router.get("/me", response_model=MeResponse)
 async def me(principal: CurrentPrincipal, session: TenantSession) -> MeResponse:
+    if principal.user_id is None:
+        # An API key is not somebody. Inventing a profile for one would put a
+        # person's name on a pipeline's actions.
+        raise PlimsollError(
+            ErrorCode.PERMISSION_DENIED, "This endpoint describes a user, not an API key."
+        )
     profile = await user_repo.get_profile(session, principal.user_id)
     if profile is None:
         raise PlimsollError(ErrorCode.NOT_FOUND, "The account no longer exists.")

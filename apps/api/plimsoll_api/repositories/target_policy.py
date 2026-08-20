@@ -20,7 +20,7 @@ async def current(session: AsyncSession) -> sa.Row[Any] | None:
 
 
 async def insert_next_version(
-    session: AsyncSession, *, org_id: uuid.UUID, created_by: uuid.UUID, allowlist: list[str]
+    session: AsyncSession, *, org_id: uuid.UUID, created_by: uuid.UUID | None, allowlist: list[str]
 ) -> sa.Row[Any]:
     """Rows are immutable: a change is a new version, so a historical run can
     resolve what was permitted when it ran.
