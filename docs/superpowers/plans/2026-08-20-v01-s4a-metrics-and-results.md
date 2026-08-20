@@ -565,13 +565,13 @@ control plane over the socket it already holds, and the API publishes on its
 behalf, stamping the organisation from the token. That keeps the trust boundary
 where S3 put it.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `apps/api/tests/integration/test_metrics_ingestion.py` opens an agent socket
 with a minted token, sends one `metrics` frame, and asserts a message lands on
 `metrics.ingestion` carrying the run's organisation — not one the agent chose.
 
-- [ ] **Step 2: Add the frame and the relay**
+- [x] **Step 2: Add the frame and the relay**
 
 In `plimsoll_contracts/agent.py`:
 
@@ -586,14 +586,14 @@ In `messaging.py`, `METRICS_INGESTION = "metrics.ingestion"` and
 publish each window with `runId` and `organizationId` taken from `claims`,
 never from the payload, then answer `Accepted`.
 
-- [ ] **Step 3: Run the folder beside JMeter**
+- [x] **Step 3: Run the folder beside JMeter**
 
 In the agent, while `execute` runs, a task tails the JTL and drains every
 `WINDOW_SECONDS`, sending what closed. On completion it drains once more with
 `now = +inf` so the final partial window is not lost. A send failure is logged
 and dropped: **a metrics failure never fails a run.**
 
-- [ ] **Step 4: Run the tests and commit**
+- [x] **Step 4: Run the tests and commit**
 
 ```bash
 make contracts && make lint && make typecheck && make test && make test-int
@@ -616,15 +616,15 @@ The merge is keyed by `(run_id, transaction, window_start)` and **ignores
 ordinal** — that is the whole point: two generators reporting the same window
 produce one row whose sketch is the sum of theirs.
 
-- [ ] **Step 1: Write the failing unit test** — two generators, same window,
+- [x] **Step 1: Write the failing unit test** — two generators, same window,
       one merged row whose count is the sum and whose p95 comes from the merged
       distribution rather than either input.
-- [ ] **Step 2: Write the merge and the writer.** One row per key with
+- [x] **Step 2: Write the merge and the writer.** One row per key with
       `metric_kind = 'histogram'`, `entity_type = 'transaction'`, the sketch in
       `sketch BYTEA`, and `organization_id` stamped from the run.
-- [ ] **Step 3: Add the loop** beside reconciliation and probes, on its own
+- [x] **Step 3: Add the loop** beside reconciliation and probes, on its own
       task for the same reason: a slow merge must not delay a run.
-- [ ] **Step 4: Run everything and commit.**
+- [x] **Step 4: Run everything and commit.**
 
 ---
 
