@@ -14,7 +14,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from plimsoll_api import storage
 from plimsoll_api.db.session import session_for_org
-from plimsoll_api.messaging import get_bus, run_channel
+from plimsoll_api.messaging import METRICS_INGESTION, get_bus, run_channel
 from plimsoll_api.repositories import runs as repo
 from plimsoll_api.security.tokens import AgentClaims, TokenError, decode_agent_token
 from plimsoll_api.services import credentials
@@ -25,6 +25,7 @@ from plimsoll_contracts.agent import (
     Command,
     CommandFrame,
     HeartbeatAck,
+    MetricsFrame,
     Registered,
     StateReport,
 )
@@ -135,6 +136,24 @@ async def agent_channel(websocket: WebSocket, run_id: uuid.UUID) -> None:
                         by_alias=True
                     )
                 )
+
+            elif kind == "metrics":
+                frame = MetricsFrame.model_validate(raw)
+                for window in frame.windows:
+                    # The run and the organisation come from the token, never
+                    # from the payload: an agent is outside the trust boundary,
+                    # and a tenant identifier it supplied would be an
+                    # authorisation bypass on the hypertable.
+                    await get_bus().publish(
+                        METRICS_INGESTION,
+                        {
+                            **window,
+                            "runId": str(claims.run_id),
+                            "ordinal": str(claims.ordinal),
+                            "organizationId": str(claims.organization_id),
+                        },
+                    )
+                await websocket.send_text(Accepted().model_dump_json())
 
             elif kind == "artifact_url_request":
                 request = ArtifactUrlRequest.model_validate(raw)

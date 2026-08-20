@@ -27,7 +27,11 @@ RUNS_EXECUTION = "runs.execution"
 # container runtime. Kept off the execution stream so a probe can never sit
 # behind a run, nor a run behind a probe.
 POOL_PROBES = "pools.probe"
+# Sketches on their way from generators to the merge. Kept off the execution
+# stream: metrics are high volume and a slow merge must never delay a run.
+METRICS_INGESTION = "metrics.ingestion"
 WORKER_GROUP = "orchestrators"
+METRICS_GROUP = "metrics"
 
 
 def run_channel(run_id: Any) -> str:

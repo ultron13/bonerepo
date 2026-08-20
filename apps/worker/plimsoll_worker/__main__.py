@@ -21,6 +21,8 @@ from plimsoll_api.config import get_settings
 from plimsoll_api.db.session import session_for_org
 from plimsoll_api.logging import configure_logging
 from plimsoll_api.messaging import (
+    METRICS_GROUP,
+    METRICS_INGESTION,
     POOL_PROBES,
     RUNS_EXECUTION,
     WORKER_GROUP,
@@ -38,6 +40,7 @@ from plimsoll_api.storage import ensure_bucket, presign_get
 from plimsoll_contracts.agent import Command
 from plimsoll_contracts.runs import GeneratorStatus, RunStatus
 from plimsoll_worker.bundle import BundleRef, stage
+from plimsoll_worker.metrics import merge_batch, write
 from plimsoll_worker.reconciler import Decision, GeneratorRow, RunView, decide, is_silent
 from plimsoll_worker.runtime.base import GeneratorHandle, GeneratorSpec
 from plimsoll_worker.runtime.docker import DockerRuntime
@@ -46,6 +49,10 @@ TICK_SECONDS = 2
 # The probe consumer's own block. The API waits five seconds for an answer, so
 # this stays well inside that and costs one idle connection between probes.
 PROBE_BLOCK_MS = 2000
+# Metrics arrive continuously during a run. A batch is merged before it is
+# written, so a wider read is fewer round trips and a better merge.
+METRICS_BLOCK_MS = 2000
+METRICS_BATCH = 500
 # How much longer than the run an agent's credential stays valid. It covers
 # provisioning, the ramp, and the wind-down; it is not a licence to outlive the
 # run by any margin that matters.
@@ -350,6 +357,38 @@ async def _serve_probes(bus: RedisStreamBus, orchestrator: Orchestrator, consume
             await bus.acknowledge(POOL_PROBES, WORKER_GROUP, delivery)
 
 
+async def _ingest_metrics(bus: RedisStreamBus, consumer: str) -> None:
+    """Merge sketches and write them, on its own task.
+
+    Measurement is not execution: a batch that cannot be written is
+    acknowledged as lost rather than allowed to stall reconciliation, because a
+    run that generated load and lost a window is degraded reporting, not a
+    failed test.
+    """
+    while True:
+        deliveries = await bus.read(
+            METRICS_INGESTION,
+            METRICS_GROUP,
+            consumer,
+            count=METRICS_BATCH,
+            block_ms=METRICS_BLOCK_MS,
+        )
+        if not deliveries:
+            continue
+        try:
+            rows = merge_batch([delivery.payload for delivery in deliveries])
+            by_org: dict[uuid.UUID, list[Any]] = {}
+            for row in rows:
+                by_org.setdefault(row.organization_id, []).append(row)
+            for org_id, owned in by_org.items():
+                async with session_for_org(org_id) as session:
+                    await write(session, owned)
+        except Exception:
+            logger.exception("writing %d metric windows failed", len(deliveries))
+        for delivery in deliveries:
+            await bus.acknowledge(METRICS_INGESTION, METRICS_GROUP, delivery)
+
+
 async def main() -> None:
     configure_logging(get_settings().log_level)
     # Here rather than in a migration or a setup script, so `make dev` needs no
@@ -358,13 +397,16 @@ async def main() -> None:
     bus = get_bus()
     await bus.ensure_group(RUNS_EXECUTION, WORKER_GROUP)
     await bus.ensure_group(POOL_PROBES, WORKER_GROUP)
+    await bus.ensure_group(METRICS_INGESTION, METRICS_GROUP)
     orchestrator = Orchestrator()
     consumer = f"worker-{socket.gethostname()}"
-    # Two loops, one process: a long reconciliation must never delay a probe,
-    # and a probe must never delay a run.
+    # Three loops, one process: a long reconciliation must never delay a probe,
+    # a probe must never delay a run, and a burst of metrics must delay
+    # neither.
     await asyncio.gather(
         _reconcile_forever(bus, orchestrator, consumer),
         _serve_probes(bus, orchestrator, consumer),
+        _ingest_metrics(bus, consumer),
     )
 
 

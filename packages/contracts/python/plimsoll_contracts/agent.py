@@ -82,6 +82,18 @@ class Accepted(BaseModel):
     type: Literal["accepted"] = "accepted"
 
 
+class MetricsFrame(BaseModel):
+    """Closed windows, on their way to the ingestion stream.
+
+    The agent has no broker credential and must not gain one: it reaches the
+    control plane over the socket it already holds, and the API publishes on
+    its behalf with the organisation taken from the token.
+    """
+
+    type: Literal["metrics"] = "metrics"
+    windows: list[dict[str, str]]
+
+
 class ArtifactUrlRequest(BaseModel):
     type: Literal["artifact_url_request"] = "artifact_url_request"
     name: str

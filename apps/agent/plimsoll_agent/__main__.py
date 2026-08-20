@@ -7,23 +7,45 @@ run JMeter, upload what it produced, and report terminal state.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import sys
+import time
 from pathlib import Path
+from typing import Any
 
 import httpx
 
+from plimsoll_agent.aggregation import Folder
 from plimsoll_agent.bundle import BundleError, download
 from plimsoll_agent.channel import VERSION, Channel, command_of, connect
 from plimsoll_agent.execution import execute
+from plimsoll_agent.jtl import JtlReader
 from plimsoll_agent.lifecycle import Action, next_action
 from plimsoll_agent.targets import TargetRefused, hosts_in, refuse_disallowed
 from plimsoll_contracts.agent import AgentState, Command, Register
+from plimsoll_contracts.metrics import WINDOW_SECONDS, SketchWindow
 from plimsoll_executor.base import ExecutionContext, Outcome
 
 WORK = Path("/tmp/run")  # noqa: S108 - the container's own tmpfs, not shared
 OUTPUT = Path("/tmp/out")  # noqa: S108
 UPLOAD_ATTEMPTS = 3
+RESULTS_NAME = "results.jtl"
+
+
+# A reply may sit behind frames this socket did not ask for -- a heartbeat
+# acknowledgement, a command push, the receipt for a metrics frame. Reading a
+# fixed number ahead is what stops one of those being mistaken for the answer.
+REPLY_LOOKAHEAD = 20
+
+
+async def _await_reply(channel: Channel, kind: str, name: str) -> dict[str, Any] | None:
+    """The next frame is not necessarily the answer to the last question."""
+    for _ in range(REPLY_LOOKAHEAD):
+        message = await channel.receive()
+        if message.get("type") == kind and message.get("name") == name:
+            return message
+    return None
 
 
 def _files_in(directory: Path) -> list[Path]:
@@ -45,8 +67,8 @@ async def upload_artifacts(channel: Channel, directory: Path) -> list[str]:
     uploaded: list[str] = []
     for path in await asyncio.to_thread(_files_in, directory):
         await channel.send_raw({"type": "artifact_url_request", "name": path.name})
-        reply = await channel.receive()
-        if reply.get("type") != "artifact_url":
+        reply = await _await_reply(channel, "artifact_url", path.name)
+        if reply is None:
             continue
         payload = await asyncio.to_thread(path.read_bytes)
         for attempt in range(UPLOAD_ATTEMPTS):
@@ -64,6 +86,57 @@ async def upload_artifacts(channel: Channel, directory: Path) -> list[str]:
                 else:
                     await asyncio.sleep(2**attempt)
     return uploaded
+
+
+def _read_more(handle: object) -> str:
+    text: str = handle.read()  # type: ignore[attr-defined]
+    return text
+
+
+async def _ship_metrics(channel: Channel, windows: list[SketchWindow]) -> None:
+    """A metrics failure never fails a run.
+
+    The run generated the load either way; refusing to record that because a
+    window did not transfer would destroy more than it protects.
+    """
+    if not windows:
+        return
+    with contextlib.suppress(Exception):
+        await channel.send_raw({"type": "metrics", "windows": [w.as_message() for w in windows]})
+
+
+async def _fold_while_running(
+    channel: Channel, folder: Folder, results: Path, finished: asyncio.Event
+) -> None:
+    """Tail the JTL beside JMeter and ship each window as it closes.
+
+    Reading the file JMeter is writing is what makes the dashboard live; the
+    same bytes reach object storage at the end regardless, so nothing here is
+    the only copy of anything.
+    """
+    reader = JtlReader()
+    handle = None
+    try:
+        while True:
+            if handle is None and await asyncio.to_thread(results.exists):
+                handle = await asyncio.to_thread(results.open, "r")
+            if handle is not None:
+                text = await asyncio.to_thread(_read_more, handle)
+                for sample in reader.feed(text):
+                    folder.record(sample)
+                await _ship_metrics(channel, folder.drain(time.time()))
+            if finished.is_set():
+                # One last pass, then close the window JMeter was still filling
+                # when it stopped -- otherwise the end of every run is lost.
+                if handle is not None:
+                    for sample in reader.feed(await asyncio.to_thread(_read_more, handle)):
+                        folder.record(sample)
+                await _ship_metrics(channel, folder.drain_all())
+                return
+            await asyncio.wait([asyncio.create_task(finished.wait())], timeout=WINDOW_SECONDS)
+    finally:
+        if handle is not None:
+            await asyncio.to_thread(handle.close)
 
 
 async def _watch_for_stop(channel: Channel, stop: asyncio.Event) -> None:
@@ -139,6 +212,15 @@ async def run_agent() -> int:
                     await channel.report(state)
                     stop = asyncio.Event()
                     watcher = asyncio.create_task(_watch_for_stop(channel, stop))
+                    finished = asyncio.Event()
+                    folding = asyncio.create_task(
+                        _fold_while_running(
+                            channel,
+                            Folder(run_id=run_id, ordinal=ordinal),
+                            OUTPUT / RESULTS_NAME,
+                            finished,
+                        )
+                    )
                     try:
                         outcome = await execute(
                             ExecutionContext(
@@ -154,6 +236,12 @@ async def run_agent() -> int:
                         )
                     finally:
                         watcher.cancel()
+                        # The folder gets to finish: its last drain carries the
+                        # window JMeter was still filling.
+                        finished.set()
+                        with contextlib.suppress(Exception):
+                            await asyncio.wait_for(folding, timeout=WINDOW_SECONDS * 2)
+                        folding.cancel()
                     await upload_artifacts(channel, OUTPUT)
                     state = (
                         AgentState.COMPLETED if outcome is Outcome.COMPLETED else AgentState.FAILED
