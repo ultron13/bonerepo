@@ -3241,7 +3241,7 @@ git commit -s -m "feat(api): stop and cancel a run, idempotently"
 - Modify: `apps/api/plimsoll_api/routers/pools.py`, `apps/api/plimsoll_api/services/pools.py`, `docs/architecture/06-api.md`, `docs/architecture/02-execution-plane.md`, `README.md`
 - Test: `apps/api/tests/integration/test_slice3a_demonstration.py`
 
-- [ ] **Step 1: Write `test-connection`**
+- [x] **Step 1: Write `test-connection`**
 
 S2 deferred this endpoint because it needed a runtime. The runtime now exists —
 but it lives in the **worker**, which is the only process holding the Docker
@@ -3385,7 +3385,7 @@ def test_a_viewer_cannot_probe_a_pool(
     )
 ```
 
-- [ ] **Step 2: Write the demonstration test**
+- [x] **Step 2: Write the demonstration test**
 
 `apps/api/tests/integration/test_slice3a_demonstration.py`:
 
@@ -3418,7 +3418,7 @@ def test_a_test_becomes_a_run_and_returns(admin_client: httpx.Client) -> None:
     assert detail["summary"]["generators"] >= 1
 ```
 
-- [ ] **Step 3: Correct the documents**
+- [x] **Step 3: Correct the documents**
 
 In `docs/architecture/02-execution-plane.md`:
 - Replace the run state machine's opening states — `DRAFT`, `READY`, `SCHEDULED` belong to a test, not a run. The run begins at `QUEUED`, as `06-api.md` already documents.
@@ -3428,7 +3428,7 @@ In `docs/architecture/06-api.md`, add the run endpoints that now exist, marking 
 
 In `README.md`, extend the quickstart journey with starting a run and polling its status, using the same `curl` shape the S2 section uses.
 
-- [ ] **Step 4: Run everything**
+- [x] **Step 4: Run everything**
 
 ```bash
 make dev-down && make dev
@@ -3436,7 +3436,7 @@ make lint && make typecheck && make test && make test-int
 make contracts && git diff --quiet
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -3447,15 +3447,15 @@ git commit -s -m "feat(api): pool connectivity, and the S3a journey documented"
 
 ## Slice acceptance
 
-- [ ] A test defined in S2 starts a run over HTTP and the run reaches `COMPLETED`
-- [ ] `configuration_snapshot` pins the commit SHAs preflight resolved
-- [ ] Generators are real containers, created with no restart policy, and are gone afterwards
-- [ ] `stop` and `cancel` are idempotent, and both are `200` on an already-finished run
-- [ ] Killing a generator mid-run produces a degraded or failed run, never a quiet success
-- [ ] A duplicate execution message produces N containers, not 2N
-- [ ] A run cannot start unless preflight passes, and the failure lists every failing check
-- [ ] A `VIEWER` is refused run creation, stop, and cancel
-- [ ] `make dev`, `make lint`, `make typecheck`, `make test`, `make test-int`, and `make contracts` all pass, the last leaving the tree clean
+- [x] A test defined in S2 starts a run over HTTP and the run reaches `COMPLETED`
+- [x] `configuration_snapshot` pins the commit SHAs preflight resolved
+- [x] Generators are real containers, created with no restart policy, and are gone afterwards
+- [x] `stop` and `cancel` are idempotent, and both are `200` on an already-finished run
+- [x] Killing a generator mid-run produces a degraded or failed run, never a quiet success
+- [x] A duplicate execution message produces N containers, not 2N
+- [x] A run cannot start unless preflight passes, and the failure lists every failing check
+- [x] A `VIEWER` is refused run creation, stop, and cancel
+- [x] `make dev`, `make lint`, `make typecheck`, `make test`, `make test-int`, and `make contracts` all pass, the last leaving the tree clean
 
 ## Self-review notes
 
