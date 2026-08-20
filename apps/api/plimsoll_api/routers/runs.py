@@ -41,6 +41,7 @@ def _response(row: Any) -> RunResponse:
         created_at=row.created_at,
         configuration_snapshot=row.configuration_snapshot,
         summary=row.summary,
+        sla_result=row.sla_result,
     )
 
 

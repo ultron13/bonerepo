@@ -253,3 +253,24 @@ async def record_bundle_digest(session: AsyncSession, run_id: uuid.UUID, digest:
         ),
         {"id": run_id, "digest": digest},
     )
+
+
+async def record_sla_result(
+    session: AsyncSession, run_id: uuid.UUID, outcome: str, detail: dict[str, Any]
+) -> None:
+    """The verdict in two places, because they answer different questions.
+
+    `sla_result` is one word, as the data model types it: it is what a list of
+    runs filters and sorts on. The per-rule breakdown goes into `summary`
+    beside the rest of what the run reports, because it is read with the run
+    rather than across runs.
+    """
+    await session.execute(
+        sa.text(
+            "UPDATE test_runs "
+            "SET sla_result = :outcome, "
+            "    summary = COALESCE(summary, '{}'::jsonb) || CAST(:detail AS jsonb) "
+            "WHERE id = :id"
+        ),
+        {"id": run_id, "outcome": outcome, "detail": json.dumps({"sla": detail})},
+    )

@@ -65,6 +65,11 @@ class RunResponse(BaseModel):
     created_at: datetime = Field(serialization_alias="createdAt")
     configuration_snapshot: dict[str, Any] = Field(serialization_alias="configurationSnapshot")
     summary: dict[str, Any] | None = None
+    # The run's overall verdict -- PASS, WARNING, or FAIL -- decided at
+    # completion from merged data and the rules the run pinned. One word,
+    # because this is what a list of runs filters on; the per-rule breakdown
+    # is in `summary.sla`.
+    sla_result: str | None = Field(default=None, serialization_alias="slaResult")
 
 
 class RunStatusResponse(BaseModel):

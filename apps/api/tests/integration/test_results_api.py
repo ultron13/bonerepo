@@ -26,13 +26,27 @@ def test_a_completed_run_reports_a_transaction_summary(
     assert browse["min"] <= browse["p50"]
 
 
+# HDR reports the highest value equivalent to the bucket a sample fell in, so
+# a percentile can sit a fraction above the exact maximum -- recording 2500 and
+# asking for p99 answers 2501. The architecture states the trade plainly:
+# sketches are accurate to about 0.1%, bounded and known, against an averaging
+# error that is neither. min and max come from exact counters, so the
+# comparison has to allow the sketch its documented precision.
+SKETCH_TOLERANCE = 1.002
+
+
 def test_percentiles_lie_inside_the_observed_range(
     admin_client: httpx.Client, completed_run: str
 ) -> None:
-    """A percentile outside min..max is the signature of an averaged one."""
+    """A percentile far outside min..max is the signature of an averaged one.
+
+    Averaging two generators' percentiles produces a number no request saw,
+    and it misses by seconds rather than by a rounding step.
+    """
     for item in admin_client.get(f"/api/v1/runs/{completed_run}/metrics").json()["transactions"]:
         for name in ("p50", "p90", "p95", "p99"):
-            assert item["min"] <= item[name] <= item["max"], (name, item)
+            assert item["min"] / SKETCH_TOLERANCE <= item[name], (name, item)
+            assert item[name] <= item["max"] * SKETCH_TOLERANCE, (name, item)
 
 
 def test_the_summary_counts_every_sample_the_windows_hold(

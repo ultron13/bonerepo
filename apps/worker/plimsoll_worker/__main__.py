@@ -35,9 +35,12 @@ from plimsoll_api.messaging import (
 from plimsoll_api.repositories import pools as pools_repo
 from plimsoll_api.repositories import runs as repo
 from plimsoll_api.security.tokens import issue_agent_token
+from plimsoll_api.services import results as results_service
 from plimsoll_api.services import script_repos
+from plimsoll_api.services.sla import evaluate
 from plimsoll_api.storage import ensure_bucket, presign_get
 from plimsoll_contracts.agent import Command
+from plimsoll_contracts.performance_tests import SlaRuleSpec
 from plimsoll_contracts.runs import GeneratorStatus, RunStatus
 from plimsoll_worker.bundle import BundleRef, stage
 from plimsoll_worker.metrics import merge_batch, write
@@ -58,6 +61,11 @@ METRICS_BATCH = 500
 # run by any margin that matters.
 GRACE_SECONDS = 120
 RECLAIM_AFTER = timedelta(seconds=60)
+# The last window a generator sends is already on the ingestion stream by the
+# time it reports COMPLETED, but the metrics loop may not have consumed it. A
+# verdict computed a moment too early would judge the run on all but its final
+# seconds, so completion waits for the stream to catch up.
+METRICS_SETTLE_SECONDS = 6
 NETWORK = os.environ.get("PLIMSOLL_GENERATOR_NETWORK", "plimsoll_default")
 INTERNAL_API_URL = os.environ.get("PLIMSOLL_INTERNAL_API_URL", "http://api:8000")
 
@@ -278,6 +286,43 @@ class Orchestrator:
         await self._runtime.teardown(handles)
         return handles
 
+    async def _evaluate_sla(self, run: sa.Row[Any], org_id: uuid.UUID) -> None:
+        """Judge the run once, against merged data, from the rules it pinned.
+
+        The snapshot's rules rather than the test's: a rule edited after the
+        run started describes a different test (invariant 3).
+        """
+        rules = [
+            SlaRuleSpec.model_validate(rule)
+            for rule in run.configuration_snapshot.get("slaRules", [])
+        ]
+        async with session_for_org(org_id) as session:
+            summary = await results_service.for_run(session, run.id)
+            fresh = await repo.get(session, run.id)
+        result = evaluate(rules, summary, degraded=bool(fresh.degraded) if fresh else False)
+        async with session_for_org(org_id) as session:
+            await repo.record_sla_result(
+                session,
+                run.id,
+                result.outcome.name,
+                {
+                    "detail": result.detail,
+                    "rules": [
+                        {
+                            "name": item.name,
+                            "metric": item.metric,
+                            "entity": item.entity,
+                            "operator": item.operator,
+                            "threshold": item.threshold,
+                            "actual": item.actual,
+                            "verdict": item.verdict.name,
+                            "detail": item.detail,
+                        }
+                        for item in result.rules
+                    ],
+                },
+            )
+
     async def _finish(self, run: sa.Row[Any], org_id: uuid.UUID, status: RunStatus) -> None:
         handles = await self._reap(run.id, org_id)
 
@@ -290,6 +335,17 @@ class Orchestrator:
                 run.id,
                 {"generators": len(handles), "outcome": str(status)},
             )
+
+        if status is RunStatus.COMPLETED:
+            # Only a run that finished has a result worth judging; a failed or
+            # cancelled one has nothing to compare a threshold against.
+            await asyncio.sleep(METRICS_SETTLE_SECONDS)
+            try:
+                await self._evaluate_sla(run, org_id)
+            except Exception:
+                # A verdict is reporting, not execution. Losing it must not
+                # unfinish a run that already completed.
+                logger.exception("evaluating SLA rules for run %s failed", run.id)
 
 
 async def _reconcile_forever(

@@ -947,6 +947,8 @@ export interface components {
             summary?: {
                 [key: string]: unknown;
             } | null;
+            /** Slaresult */
+            slaResult?: string | null;
         };
         /**
          * RunStatus
