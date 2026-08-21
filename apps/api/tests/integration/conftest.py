@@ -44,6 +44,7 @@ os.environ["PLIMSOLL_S3_ENDPOINT"] = os.environ.get(
 
 from plimsoll_api import storage
 from plimsoll_api.config import get_settings
+from plimsoll_api import messaging
 from plimsoll_api.db import session as db_session
 from plimsoll_api.security import secrets
 
@@ -64,9 +65,16 @@ async def _dispose_pooled_connections() -> AsyncIterator[None]:
     Pooled asyncpg connections are bound to the loop that opened them, so a
     connection reused by the next test raises "Event loop is closed". Dropping
     the pool after each test costs a reconnect and removes the coupling.
+
+    The Redis client is cached the same way and was not being dropped, which
+    made it the same bug waiting for a test that used it hard enough to reuse
+    a pooled connection rather than open a fresh one. One did, eventually, and
+    only in a full run -- the coupling is to whichever loop happened to be
+    first, so a test passes alone and fails in company.
     """
     yield
     await db_session.get_engine().dispose()
+    await messaging.get_bus().client.aclose()
 
 
 API_URL = os.environ.get("PLIMSOLL_TEST_API_URL", "http://localhost:8000")
