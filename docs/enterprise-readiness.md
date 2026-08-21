@@ -382,6 +382,29 @@ The compose services also restart now, which is a smaller point and a real
 one: a development stack that stays dead after a dependency blinks teaches the
 wrong thing about the system.
 
+### 7i. A dependency being away answered 500 — closed
+
+Completing the sweep that found the worker exiting on a broker outage. The
+object store and the database both behaved well when stopped: readiness
+reported `not-ready` naming the failing check, liveness stayed 200 in three
+milliseconds without touching anything, reads failed in milliseconds rather
+than hanging, a run failed cleanly with zero generators, and both processes
+survived and recovered.
+
+What was wrong was the answer. A stopped database produced **500**, which
+tells a client the server has a bug: a CI pipeline will not retry it, a load
+balancer will not take the instance out, and the page goes to whoever owns the
+code rather than whoever owns the database. It is now **503** with
+`Retry-After`.
+
+The first fix caught SQLAlchemy's `OperationalError` and never fired. A
+container that is stopped stops resolving, so the failure arrives as
+`socket.gaierror` before any driver is involved -- which is also the ordinary
+shape of an outage behind a Kubernetes Service with no endpoints. The handlers
+are named types rather than a broad `OSError`, so a genuine bug is still 500
+rather than hidden behind a retry loop, and `IntegrityError` stays 500 too
+because a row that breaks a constraint will break it identically for ever.
+
 ### 8. Operational edges
 
 - The worker container runs as root to reach the Docker socket. Development

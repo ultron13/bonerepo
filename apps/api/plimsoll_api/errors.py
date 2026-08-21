@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import logging
+import socket
 from typing import Any
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from redis.exceptions import ConnectionError as RedisConnectionError
+from sqlalchemy.exc import OperationalError
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -14,6 +17,10 @@ from plimsoll_api.middleware import REQUEST_ID_SCOPE_KEY
 from plimsoll_contracts.errors import HTTP_STATUS_FOR_CODE, ErrorCode, ErrorEnvelope
 
 logger = logging.getLogger(__name__)
+
+# Long enough that a retry is not part of the outage, short enough to be worth
+# making. A restarting database is usually back inside this.
+RETRY_AFTER_SECONDS = 5
 
 _STATUS_TO_CODE = {
     401: ErrorCode.UNAUTHENTICATED,
@@ -95,6 +102,36 @@ def register_error_handlers(app: FastAPI) -> None:
             "The request could not be accepted. See details for every problem found.",
             {"fields": fields},
         )
+
+    def _unavailable(what: str) -> Any:
+        async def handler(request: Request, exc: Exception) -> JSONResponse:
+            logger.warning("%s is unreachable: %s: %s", what, type(exc).__name__, exc)
+            return _envelope(
+                request,
+                ErrorCode.DEPENDENCY_UNAVAILABLE,
+                f"The {what} is temporarily unreachable. The request was not applied.",
+                None,
+                {"Retry-After": str(RETRY_AFTER_SECONDS)},
+            )
+
+        return handler
+
+    # A dependency being away is not a fault in the request, and the shape of
+    # "away" is not one exception.
+    #
+    # OperationalError is SQLAlchemy's wrapper for the connection itself --
+    # refused, dropped, timed out -- as opposed to DataError or IntegrityError,
+    # which are things a statement did and are genuinely the caller's problem.
+    #
+    # socket.gaierror and the builtin ConnectionError arrive unwrapped, because
+    # a host that no longer resolves fails before any driver is involved. That
+    # is the ordinary shape of an outage in a container network or behind a
+    # Kubernetes Service with no endpoints, and it was what this system
+    # actually raised when its database was stopped -- the first version of
+    # this handler caught OperationalError alone and never fired.
+    for failure in (OperationalError, socket.gaierror, ConnectionError):
+        app.add_exception_handler(failure, _unavailable("database"))
+    app.add_exception_handler(RedisConnectionError, _unavailable("message broker"))
 
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception) -> JSONResponse:

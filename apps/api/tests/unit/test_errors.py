@@ -16,6 +16,9 @@ def test_catalogue_matches_the_api_contract() -> None:
         "INSUFFICIENT_CAPACITY",
         "REPO_UNREACHABLE",
         "RATE_LIMITED",
+        # 503. Distinct from INTERNAL on purpose: a client is meant to retry
+        # this one and not that one.
+        "DEPENDENCY_UNAVAILABLE",
         "INTERNAL",
     }
 

@@ -22,6 +22,7 @@ class ErrorCode(StrEnum):
     INSUFFICIENT_CAPACITY = "INSUFFICIENT_CAPACITY"
     REPO_UNREACHABLE = "REPO_UNREACHABLE"
     RATE_LIMITED = "RATE_LIMITED"
+    DEPENDENCY_UNAVAILABLE = "DEPENDENCY_UNAVAILABLE"
     INTERNAL = "INTERNAL"
 
 
@@ -39,6 +40,10 @@ HTTP_STATUS_FOR_CODE: dict[ErrorCode, int] = {
     ErrorCode.INSUFFICIENT_CAPACITY: 422,
     ErrorCode.REPO_UNREACHABLE: 422,
     ErrorCode.RATE_LIMITED: 429,
+    # 503, not 500. A dependency being down is not a fault in the request:
+    # 500 tells a client the server has a bug, so pipelines do not retry it and
+    # it pages whoever owns the code rather than whoever owns the database.
+    ErrorCode.DEPENDENCY_UNAVAILABLE: 503,
     ErrorCode.INTERNAL: 500,
 }
 

@@ -61,6 +61,7 @@ repurposed. The v0.1 catalogue:
 | `INSUFFICIENT_CAPACITY` | 422 | No generator pool can supply the requested virtual users |
 | `REPO_UNREACHABLE` | 422 | Git host or credential failure during verify or ref resolution |
 | `RATE_LIMITED` | 429 | Limit exhausted; honour `Retry-After` |
+| `DEPENDENCY_UNAVAILABLE` | 503 | A dependency is unreachable; the request was not applied. Honour `Retry-After` |
 | `INTERNAL` | 500 | Unexpected fault; `requestId` is the support handle |
 
 ## Collections
