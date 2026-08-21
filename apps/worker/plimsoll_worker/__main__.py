@@ -13,7 +13,7 @@ import os
 import signal
 import socket
 import uuid
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -86,6 +86,9 @@ METRICS_BATCH = 500
 SHUTDOWN_GRACE_SECONDS = 20
 # Hourly. Nothing here is urgent, and a loop that runs often costs a query.
 MAINTENANCE_INTERVAL_SECONDS = 3600
+# Short and flat: the broker is on the same private network, and the useful
+# behaviour is to be waiting when it returns rather than to have backed off.
+BROKER_RETRY_SECONDS = 5
 # Where a scraper and a liveness probe find the worker. It serves nothing else.
 SERVE_PORT = int(os.environ.get("PLIMSOLL_WORKER_PORT", "9100"))
 # How much longer than the run an agent's credential stays valid. It covers
@@ -607,6 +610,36 @@ async def _deliver_webhooks(bus: RedisStreamBus, consumer: str, stopping: asynci
             await bus.acknowledge(WEBHOOK_DELIVERIES, WEBHOOK_GROUP, delivery)
 
 
+async def _survive_the_broker(
+    name: str, stopping: asyncio.Event, body: Callable[[], Awaitable[None]]
+) -> None:
+    """Run a loop body until asked to stop, and outlive a broker that is not there.
+
+    Every loop in this process reads from Redis, and a connection error was
+    escaping all the way out of main -- so a broker restart, a failover, or a
+    few seconds of network took the worker down and left it down. That is the
+    component that orchestrates every run: while it is gone, nothing starts,
+    nothing is reaped, and nothing is judged.
+
+    Kubernetes would restart the pod and Compose would not, but neither is the
+    point. A control plane should survive its broker blinking without needing
+    to be restarted, because the restart is what turns a blip into a gap.
+
+    Backoff is short and flat rather than exponential: this is a dependency on
+    the same private network, and the useful behaviour is to be waiting when it
+    comes back rather than to have politely backed off to a minute.
+    """
+    while not stopping.is_set():
+        try:
+            await body()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("%s failed; retrying", name)
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(stopping.wait(), timeout=BROKER_RETRY_SECONDS)
+
+
 async def _maintain(stopping: asyncio.Event) -> None:
     """Clear what nothing will read again, on a slow loop of its own.
 
@@ -751,12 +784,24 @@ async def main() -> None:
     # a probe must never delay a run, a burst of metrics must delay neither,
     # and a webhook endpoint taking ten seconds to answer must delay nothing
     # at all.
+    # Each loop is wrapped so that losing the broker is a pause rather than an
+    # exit. Without this a connection error escaped to main and the worker
+    # stopped -- verified by stopping Redis, which killed it and left it dead
+    # after Redis came back.
     work = asyncio.gather(
-        _reconcile_forever(bus, orchestrator, consumer, stopping),
-        _maintain(stopping),
-        _serve_probes(bus, orchestrator, consumer, stopping),
-        _ingest_metrics(bus, consumer, stopping),
-        _deliver_webhooks(bus, consumer, stopping),
+        _survive_the_broker(
+            "reconciler",
+            stopping,
+            lambda: _reconcile_forever(bus, orchestrator, consumer, stopping),
+        ),
+        _survive_the_broker("maintenance", stopping, lambda: _maintain(stopping)),
+        _survive_the_broker(
+            "probes", stopping, lambda: _serve_probes(bus, orchestrator, consumer, stopping)
+        ),
+        _survive_the_broker("metrics", stopping, lambda: _ingest_metrics(bus, consumer, stopping)),
+        _survive_the_broker(
+            "webhooks", stopping, lambda: _deliver_webhooks(bus, consumer, stopping)
+        ),
         serve(SERVE_PORT, stopping),
     )
     try:

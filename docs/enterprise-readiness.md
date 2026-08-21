@@ -357,6 +357,31 @@ at all, and was verified to fail with the call removed.
 Audit logs are deliberately left alone. Deleting a compliance record by default
 is a worse failure than the disk it costs.
 
+### 7h. The worker did not outlive its broker — closed
+
+Found by stopping Redis to see what the system did. The reads degraded well —
+a plain read still served, and starting a run failed in under a second with
+"nothing was started" rather than hanging. The worker exited(1) and stayed
+exited after Redis came back.
+
+A connection error escaped every loop and left `main`, so a broker restart, a
+failover, or a few seconds of network took down the component that
+orchestrates every run: while it is gone, nothing starts, nothing is reaped
+and nothing is judged. Kubernetes would have restarted the pod and Compose did
+not, but neither is the point — a control plane should survive its broker
+blinking without needing to be restarted, because the restart is what turns a
+blip into a gap.
+
+**Fixed:** every loop is wrapped so a broker failure is a pause with a short
+flat backoff. Verified by stopping Redis for twenty seconds: the worker stayed
+up, retried nineteen times, recovered when Redis returned, and then
+provisioned and started a real run. Graceful shutdown still exits 0 with its
+handover message.
+
+The compose services also restart now, which is a smaller point and a real
+one: a development stack that stays dead after a dependency blinks teaches the
+wrong thing about the system.
+
 ### 8. Operational edges
 
 - The worker container runs as root to reach the Docker socket. Development

@@ -37,6 +37,7 @@ services:
       retries: 20
 
   api:
+    restart: unless-stopped
     build:
       context: ../..
       dockerfile: infrastructure/docker/api.Dockerfile
@@ -77,6 +78,7 @@ services:
       idp-fixture: {condition: service_healthy}
 
   worker:
+    restart: unless-stopped
     build:
       context: ../..
       dockerfile: infrastructure/docker/api.Dockerfile
@@ -117,6 +119,7 @@ services:
       minio: {condition: service_healthy}
 
   web:
+    restart: unless-stopped
     build:
       context: ../..
       dockerfile: infrastructure/docker/web.Dockerfile
