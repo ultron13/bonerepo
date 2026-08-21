@@ -25,6 +25,15 @@ UNGUARDED_BY_DESIGN = {
     ("post", "/api/v1/auth/login"),
     ("post", "/api/v1/auth/refresh"),
     ("post", "/api/v1/auth/logout"),
+    # Single sign-on: both ends of a flow that exists to establish a principal.
+    ("get", "/api/v1/auth/oidc/{slug}/start"),
+    ("get", "/api/v1/auth/oidc/callback"),
+    # Creating an organisation cannot be authorised from inside one, because
+    # there is nobody in it yet. It takes an operator's token instead, so
+    # there is no permission for this enumeration to find -- and exempting it
+    # here means it is covered by test_organizations_api instead, which
+    # asserts that no user's token opens it, including an administrator's.
+    ("post", "/api/v1/organizations"),
 }
 
 PLACEHOLDER = "00000000-0000-0000-0000-000000000000"

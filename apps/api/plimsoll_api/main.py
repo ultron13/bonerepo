@@ -59,6 +59,7 @@ def create_app() -> FastAPI:
         identity,
         live,
         oidc,
+        organizations,
         performance_tests,
         pools,
         projects,
@@ -76,6 +77,7 @@ def create_app() -> FastAPI:
     app.include_router(api_keys.router)
     app.include_router(identity.router)
     app.include_router(oidc.router)
+    app.include_router(organizations.router)
     app.include_router(users.router)
     app.include_router(webhooks.router)
     app.include_router(projects.router)

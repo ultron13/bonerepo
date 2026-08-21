@@ -59,6 +59,17 @@ class Settings(BaseSettings):
     # deployments have to.
     artifact_retention_days: int = 90
 
+    # Creates organisations, and nothing else. An operator's credential rather
+    # than one this product issues: bringing a tenant into being cannot be
+    # authorised from inside a tenant, because there is nobody in it yet.
+    #
+    # Empty means the route refuses outright. A default here would be a way
+    # into every deployment that never set one, and the blast radius even when
+    # set is bounded -- it can create an empty organisation and its first
+    # administrator, and it cannot read anybody's data, because row-level
+    # security does not care what created the row.
+    instance_token: str = ""
+
     # Defaults exist so a unit test can build the application without them.
     # The compose values are the same because this is the development MinIO; a
     # deployment sets all of them.

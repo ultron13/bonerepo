@@ -189,11 +189,21 @@ is also why the map is asserted directly, in a unit test and again over HTTP.
 A permission map is only true if the routes read it, and no unit test can tell
 whether they do.
 
-**Still open:** `SUPER_ADMIN` and `PROJECT_ADMIN` from the data model. The
-first is instance-wide and this map is organisation-wide; the second needs a
-project to be scoped to, and no route resolves one yet. Also outstanding:
-organisations as a product surface — there is still no way to create one
-without a database client.
+**Organisations: closed.** A second tenant needed a hand-written `INSERT`,
+which made a multi-tenant product single-tenant in practice — the same shape
+as the missing user directory making it single-user. `POST
+/api/v1/organizations` creates one together with its first administrator,
+because an organisation nobody can enter is only reachable by making somebody,
+and making somebody is the same privilege.
+
+It takes an operator's token rather than a role. A `SUPER_ADMIN` able to reach
+across organisations would need a path around row-level security, and that is
+the tenant boundary; a token that can create an empty organisation cannot read
+anybody's data. Unset means refused, verified by unsetting it and watching a
+correct-looking value be turned away with nothing created.
+
+**Still open:** `PROJECT_ADMIN` from the data model, which needs a project to
+be scoped to and no route resolves one yet.
 
 ### 7b. Refresh tokens were unreachable from the browser — closed
 

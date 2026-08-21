@@ -240,6 +240,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Organization
+         * @description An organisation and the one administrator who can then fill it.
+         *
+         *     Created together on purpose. An organisation with nobody in it can only be
+         *     entered by making somebody, and doing that is the same privilege as this
+         *     -- so the two would always be used together, and separating them would
+         *     only mean a window in which a tenant existed and was unreachable.
+         */
+        post: operations["create_organization_api_v1_organizations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users": {
         parameters: {
             query?: never;
@@ -1140,6 +1165,33 @@ export interface components {
             orgRole: string;
             /** Organizationid */
             organizationId: string;
+        };
+        /** OrganizationCreate */
+        OrganizationCreate: {
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /**
+             * Adminemail
+             * Format: email
+             */
+            adminEmail: string;
+            /** Adminname */
+            adminName: string;
+        };
+        /** OrganizationCreated */
+        OrganizationCreated: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /** Adminemail */
+            adminEmail: string;
+            /** Admintemporarypassword */
+            adminTemporaryPassword: string;
         };
         /** Page[ApiKeyResponse] */
         Page_ApiKeyResponse_: {
@@ -2308,6 +2360,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_organization_api_v1_organizations_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrganizationCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationCreated"];
                 };
             };
             /** @description Validation Error */

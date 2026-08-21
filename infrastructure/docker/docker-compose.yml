@@ -64,6 +64,9 @@ services:
       # by default because on a shared instance it lets any tenant point a
       # webhook at anything the control plane can reach.
       PLIMSOLL_WEBHOOK_ALLOW_PRIVATE_ADDRESSES: "true"
+      # Creates organisations. A development value; a deployment sets a real
+      # one or leaves it unset, and unset means the route refuses.
+      PLIMSOLL_INSTANCE_TOKEN: development-only-instance-token
       PLIMSOLL_CORS_ORIGINS: http://localhost:3000
     ports: ["8000:8000"]
     depends_on:

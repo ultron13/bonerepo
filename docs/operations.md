@@ -70,6 +70,37 @@ Run it on a schedule, not after an incident.
   run. Any that survive the incident are adopted or reaped by the worker.
 - **Redis streams.** See above.
 
+## Creating an organisation
+
+Bringing a tenant into being cannot be authorised from inside a tenant,
+because there is nobody in it yet. It takes an operator's credential — the
+same shape as running a migration or rotating a key — rather than one the
+product issues.
+
+```bash
+curl -X POST https://plimsoll.example.com/api/v1/organizations \
+  -H "authorization: Bearer $PLIMSOLL_INSTANCE_TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"name": "Acme", "slug": "acme",
+       "adminEmail": "ada@acme.example.com", "adminName": "Ada Boss"}'
+```
+
+The response carries a temporary password for that first administrator, once.
+They can then invite everybody else and configure single sign-on.
+
+**The route refuses unless `PLIMSOLL_INSTANCE_TOKEN` is set**, and refuses
+even a correct-looking value when it is not. A default would be a way into
+every deployment that never set one.
+
+Deliberately not a role. A `SUPER_ADMIN` able to reach across organisations
+would need a path around row-level security, and row-level security is the
+tenant boundary. This token can create an empty organisation and its first
+administrator; it cannot read anybody's data, because row-level security does
+not care what created a row.
+
+The slug is what somebody types to reach their identity provider, so it must
+survive a URL: lower-case letters, digits and hyphens.
+
 ## What is kept, and for how long
 
 Nothing here grew without a bound until it was made to, and the three answers
