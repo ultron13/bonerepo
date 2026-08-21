@@ -15,7 +15,6 @@ from __future__ import annotations
 import os
 import uuid
 from collections.abc import Iterator
-from urllib.parse import parse_qs, urlparse
 
 import httpx
 import pytest
@@ -31,7 +30,7 @@ OWNER_URL = os.environ.get(
 )
 # The issuer as the API resolves it, and the same host as the browser reaches
 # on the published port. Both names point at one container.
-ISSUER = "http://idp-fixture"
+ISSUER = "http://idp-fixture:8082"
 IDP_URL = os.environ.get("PLIMSOLL_TEST_IDP_URL", "http://localhost:8082")
 DOMAIN = "sso.example.com"
 
@@ -88,6 +87,22 @@ def _sign_in(start_url: str, **provider_options: str) -> httpx.Response:
         return browser.get(callback)
 
 
+def _token_from(response: httpx.Response) -> str:
+    """What the browser does next.
+
+    The callback puts no token in the URL -- it sets an httpOnly refresh
+    cookie, and the page it lands on trades that for an access token. A token
+    in a fragment would survive in browser history for as long as it stayed
+    valid.
+    """
+    cookie = response.cookies["plimsoll_refresh"]
+    with httpx.Client(base_url=API_URL, timeout=30) as client:
+        client.cookies.set("plimsoll_refresh", cookie, path="/api/v1/auth")
+        refreshed = client.post("/api/v1/auth/refresh")
+    assert refreshed.status_code == 200, refreshed.text
+    return str(refreshed.json()["accessToken"])
+
+
 def _slug(admin_client: httpx.Client) -> str:
     engine = sa.create_engine(OWNER_URL)
     org = admin_client.get("/api/v1/auth/me").json()["organizationId"]
@@ -106,9 +121,11 @@ def test_a_first_sign_in_creates_the_account_and_a_session(
     response = _sign_in(configured["startUrl"], plimsoll_email=email)
 
     assert response.status_code == 302, response.text
-    token = parse_qs(urlparse(response.headers["location"]).fragment)["access_token"][0]
-    # A refresh cookie too, so the session behaves like any other.
+    # Nothing in the URL, and a refresh cookie so the session behaves like any
+    # other one this system issues.
+    assert "access_token" not in response.headers["location"]
     assert "plimsoll_refresh" in response.cookies
+    token = _token_from(response)
 
     with httpx.Client(base_url=API_URL, timeout=30) as client:
         client.headers["Authorization"] = f"Bearer {token}"
@@ -140,7 +157,7 @@ def test_membership_of_the_admin_group_grants_administration(
     response = _sign_in(
         configured["startUrl"], plimsoll_email=email, plimsoll_groups="plimsoll-admins,other"
     )
-    token = parse_qs(urlparse(response.headers["location"]).fragment)["access_token"][0]
+    token = _token_from(response)
 
     with httpx.Client(base_url=API_URL, timeout=30) as client:
         client.headers["Authorization"] = f"Bearer {token}"
@@ -159,7 +176,7 @@ def test_losing_the_group_takes_administration_away_again(
     _sign_in(configured["startUrl"], plimsoll_email=email, plimsoll_groups="plimsoll-admins")
 
     response = _sign_in(configured["startUrl"], plimsoll_email=email, plimsoll_groups="other")
-    token = parse_qs(urlparse(response.headers["location"]).fragment)["access_token"][0]
+    token = _token_from(response)
     with httpx.Client(base_url=API_URL, timeout=30) as client:
         client.headers["Authorization"] = f"Bearer {token}"
         assert client.get("/api/v1/auth/me").json()["orgRole"] == "VIEWER"

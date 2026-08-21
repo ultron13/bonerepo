@@ -137,12 +137,15 @@ services:
       context: ../..
       dockerfile: infrastructure/docker/idp-fixture.Dockerfile
     environment:
-      # The issuer has to be the name the API resolves, because it is both the
-      # trust anchor and the host discovery is fetched from.
-      IDP_ISSUER: http://idp-fixture
-    ports: ["8082:80"]
+      # One name that resolves for both, which is what an issuer has to be:
+      # the API fetches discovery from it, and the browser is redirected to it.
+      # Inside the network Docker's DNS answers; a browser on the host reaches
+      # the same port because it is published on the same number, and the e2e
+      # runner maps the name to loopback.
+      IDP_ISSUER: http://idp-fixture:8082
+    ports: ["8082:8082"]
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1/jwks')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8082/jwks')"]
       interval: 3s
       retries: 20
 

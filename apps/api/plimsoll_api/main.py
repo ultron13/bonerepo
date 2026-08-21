@@ -28,8 +28,17 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
-        allow_credentials=False,
-        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        # The refresh cookie is httpOnly and has to travel on the one request
+        # that trades it for an access token; without this the browser never
+        # sends it back, and the rotation this system implements is
+        # unreachable from the client that needs it.
+        #
+        # Safe only because the origins above are listed rather than opened --
+        # a browser refuses credentials against a wildcard, and for good
+        # reason. The cookie is SameSite=lax, so it does not ride a
+        # cross-site request even from an origin that is allowed here.
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["authorization", "content-type"],
     )
     app.middleware("http")(request_id_middleware)

@@ -11,7 +11,10 @@ WEB := docker run --rm -u "$$(id -u):$$(id -g)" -e HOME=/tmp -e npm_config_cache
 # Playwright needs a browser and its libraries, which the plain node image
 # does not carry, and it reaches the stack on the host rather than a
 # compose network.
-WEB_E2E := docker run --rm --network host -u "$$(id -u):$$(id -g)" -e HOME=/tmp \
+# The browser has to resolve the identity provider by the same name the API
+# does, and host networking has no Docker DNS: the name maps to loopback,
+# where its published port is.
+WEB_E2E := docker run --rm --network host --add-host idp-fixture:127.0.0.1 -u "$$(id -u):$$(id -g)" -e HOME=/tmp \
   -v "$$PWD/apps/web:/srv" -w /srv \
   -e PLIMSOLL_WEB_URL=http://localhost:3000 \
   mcr.microsoft.com/playwright:v1.62.1-noble npx playwright test

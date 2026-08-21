@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { Card, Empty, Status } from "@/components/ui";
-import { api, readToken, signIn } from "@/lib/api";
+import { api, apiBase, readToken, signIn } from "@/lib/api";
 import type { Me, Page, Run } from "@/lib/types";
 
 function SignIn({ onDone }: { onDone: () => void }) {
@@ -14,6 +14,45 @@ function SignIn({ onDone }: { onDone: () => void }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [slug, setSlug] = useState("");
+  const [sso, setSso] = useState(false);
+
+  if (sso) {
+    return (
+      <form
+        className="mx-auto mt-24 max-w-sm space-y-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          // A full navigation, not fetch: the provider answers with a redirect
+          // to its own sign-in page, which is a place the browser has to go
+          // rather than a response to read.
+          window.location.href = `${apiBase()}/api/v1/auth/oidc/${encodeURIComponent(slug)}/start`;
+        }}
+      >
+        <h1 className="text-xl font-semibold text-slate-100">Plimsoll</h1>
+        <label className="block text-sm text-muted">
+          Organisation
+          <input
+            className="mt-1 w-full rounded border border-line bg-ink px-3 py-2 font-mono text-sm text-slate-200"
+            value={slug}
+            onChange={(event) => setSlug(event.target.value)}
+            placeholder="acme"
+            autoComplete="organization"
+          />
+        </label>
+        <button className="w-full rounded bg-accent px-3 py-2 text-sm font-medium text-ink">
+          Continue to your provider
+        </button>
+        <button
+          type="button"
+          className="w-full text-xs text-muted hover:text-slate-300"
+          onClick={() => setSso(false)}
+        >
+          Use a password instead
+        </button>
+      </form>
+    );
+  }
 
   return (
     <form
@@ -58,6 +97,13 @@ function SignIn({ onDone }: { onDone: () => void }) {
         disabled={busy}
       >
         {busy ? "Signing in…" : "Sign in"}
+      </button>
+      <button
+        type="button"
+        className="w-full text-xs text-muted hover:text-slate-300"
+        onClick={() => setSso(true)}
+      >
+        Single sign-on
       </button>
     </form>
   );
@@ -152,12 +198,20 @@ export default function Home() {
           {/* Hidden from a viewer because a link that answers 403 is not
               navigation. The refusal itself is the server's, not this. */}
           {me.data?.orgRole === "ORG_ADMIN" ? (
-            <Link
-              className="text-accent hover:underline"
-              href="/settings/users"
-            >
-              People
-            </Link>
+            <>
+              <Link
+                className="text-accent hover:underline"
+                href="/settings/users"
+              >
+                People
+              </Link>
+              <Link
+                className="text-accent hover:underline"
+                href="/settings/sso"
+              >
+                Single sign-on
+              </Link>
+            </>
           ) : null}
           <Link className="text-accent hover:underline" href="/projects">
             Projects →

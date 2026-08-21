@@ -163,8 +163,35 @@ service would put it on the critical path of a local start-up. It signs real
 RS256 tokens with a real key, and can be asked for the tokens that should be
 refused — which is the reason to write one rather than use one.
 
+The browser side landed a beat later, and finding out why is the point of
+having a browser test at all. The first version redirected to a page that did
+not exist, so every API check passed and nobody could sign in. Fixing that
+surfaced two more: `PUT` was missing from the CORS allow-list, so configuring
+a provider failed with "Failed to fetch" — no page had ever used `PUT` — and
+the settings page kept showing single sign-on as configured after it was
+turned off, because a query keeps its last successful value when the next
+fetch errors.
+
+The redirect no longer carries a token at all. The callback sets the refresh
+cookie and the landing page trades it for an access token, so nothing valid
+sits in browser history.
+
 **Still open:** organisations as a product surface — creating one, and roles
 beyond `ORG_ADMIN` and `VIEWER`.
+
+### 7b. Refresh tokens were unreachable from the browser — closed
+
+Rotation, family revocation and theft detection were all implemented and
+tested, and the client could not use any of it. CORS ran with
+`allow_credentials=False` and the client never asked for credentials, so the
+httpOnly refresh cookie was set at sign-in and never sent back. A session
+simply ended when its access token did, fifteen minutes later, and the
+carefully built rotation underneath was unreachable.
+
+**Fixed:** credentials are allowed — safe only because the origins are listed
+rather than opened, and the cookie is `SameSite=lax` so it does not ride a
+cross-site request. Found while wiring single sign-on, which needs the same
+cookie.
 
 ### 8. Operational edges
 

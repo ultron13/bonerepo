@@ -70,6 +70,11 @@ async function request<T>(
   const token = readToken();
   const response = await fetch(`${BASE}${path}`, {
     ...init,
+    // The refresh cookie is httpOnly and lives on the API's origin, so it
+    // only travels if the request asks for it. Without this the rotation the
+    // API implements is never reached, and a session simply ends when its
+    // access token does.
+    credentials: "include",
     headers: {
       "content-type": "application/json",
       ...(token ? { authorization: `Bearer ${token}` } : {}),
@@ -123,7 +128,26 @@ export const api = {
     }),
   patch: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
+  put: <T>(path: string, body: unknown) =>
+    request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
+  delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };
+
+/**
+ * Finish a sign-in that happened at an identity provider.
+ *
+ * The refresh cookie is already set; this trades it for an access token. The
+ * same call the client makes when a session ages out, used here for a session
+ * that has just begun.
+ */
+export async function completeSignIn(): Promise<void> {
+  const body = await request<{ accessToken: string }>(
+    "/api/v1/auth/refresh",
+    { method: "POST" },
+    true,
+  );
+  storeToken(body.accessToken);
+}
 
 export async function signIn(email: string, password: string): Promise<void> {
   const body = await request<{ accessToken: string }>(

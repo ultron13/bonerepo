@@ -25,7 +25,6 @@ from plimsoll_api.repositories import identity_providers as repo
 from plimsoll_api.security import oidc
 from plimsoll_api.security.oidc import OidcError
 from plimsoll_api.security.secrets import get_key_provider
-from plimsoll_api.security.tokens import issue_access_token
 from plimsoll_api.services import audit
 from plimsoll_api.services import oidc as service
 from plimsoll_api.services.refresh import issue_family
@@ -152,7 +151,10 @@ async def callback(
                 nonce=flow["nonce"],
                 groups_claim=provider.groups_claim,
             )
-            user_id, role = await service.sign_in(
+            # The role is reconciled with the provider inside sign_in and read
+            # back from the record when the refresh cookie is traded for an
+            # access token, so it is not carried through this response.
+            user_id, _role = await service.sign_in(
                 session, org_id=org_id, identity=identity, provider=provider
             )
         except OidcError as exc:
@@ -169,10 +171,13 @@ async def callback(
         )
         refresh = await issue_family(session, user_id, org_id)
 
-    access = issue_access_token(user_id, org_id, role)
+    # No token in the URL. The refresh cookie set below is what the browser
+    # carries back, and the page it lands on trades that for an access token
+    # over a request nobody else sees. A token in a fragment would survive in
+    # browser history and in anything that logs a location, for the whole
+    # fifteen minutes it stays valid.
     redirect = RedirectResponse(
-        settings.public_web_url.rstrip("/") + f"/sign-in/complete#access_token={access}",
-        status_code=302,
+        settings.public_web_url.rstrip("/") + "/sign-in/complete", status_code=302
     )
     redirect.set_cookie(
         "plimsoll_refresh",

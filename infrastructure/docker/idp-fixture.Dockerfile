@@ -7,5 +7,5 @@ RUN pip install --no-cache-dir "pyjwt[crypto]>=2.8" "cryptography>=43.0"
 
 COPY images/idp-fixture/server.py /server.py
 
-EXPOSE 80
+EXPOSE 8082
 CMD ["python", "/server.py"]

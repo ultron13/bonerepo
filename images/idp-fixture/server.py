@@ -16,6 +16,10 @@ test can ask for the tokens that should be refused:
     ?plimsoll_nonce=other            a token minted for a different sign-in
     ?plimsoll_groups=a,b             group membership for role mapping
     ?plimsoll_email=someone@x.test   who signs in
+
+A browser flow is started by the API, which builds the authorize URL itself, so
+those cannot be passed in the query string. `POST /control` sets them for the
+next sign-in instead.
 """
 
 from __future__ import annotations
@@ -32,7 +36,14 @@ from urllib.parse import parse_qs, urlencode, urlparse
 import jwt
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-ISSUER = os.environ.get("IDP_ISSUER", "http://idp-fixture")
+ISSUER = os.environ.get("IDP_ISSUER", "http://idp-fixture:8082")
+PORT = int(os.environ.get("IDP_PORT", "8082"))
+
+# What the next authorize call will issue, when the caller cannot put it in the
+# query string. A browser flow is started by the API, which builds the
+# authorize URL itself, so a test driving a browser has no way to say who is
+# signing in -- this is that way.
+NEXT: dict[str, object] = {}
 KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 KID = "idp-fixture-key"
 
@@ -105,6 +116,8 @@ class Handler(BaseHTTPRequestHandler):
 
         if url.path == "/authorize":
             code = uuid.uuid4().hex
+            for key, value in NEXT.items():
+                query.setdefault(key, str(value))
             groups = query.get("plimsoll_groups", "")
             PENDING[code] = {
                 "aud": query.get("client_id", ""),
@@ -135,12 +148,20 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         url = urlparse(self.path)
-        if url.path != "/token":
+        if url.path not in ("/token", "/control"):
             self._send(404, {"error": "not_found"})
             return
 
         length = int(self.headers.get("content-length", "0"))
-        form = {k: v[0] for k, v in parse_qs(self.rfile.read(length).decode()).items()}
+        body = self.rfile.read(length)
+
+        if url.path == "/control":
+            NEXT.clear()
+            NEXT.update(json.loads(body or b"{}"))
+            self._send(200, {"next": dict(NEXT)})
+            return
+
+        form = {k: v[0] for k, v in parse_qs(body.decode()).items()}
         claims = PENDING.pop(form.get("code", ""), None)
         if claims is None:
             self._send(400, {"error": "invalid_grant"})
@@ -166,4 +187,4 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     # A container on a private network, reached by service name.
-    ThreadingHTTPServer(("0.0.0.0", 80), Handler).serve_forever()  # noqa: S104
+    ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()  # noqa: S104
