@@ -51,6 +51,14 @@ class Settings(BaseSettings):
     # not on a shared one.
     webhook_allow_private_addresses: bool = False
 
+    # How long raw run artifacts are kept in object storage. This is the
+    # largest thing this system produces -- a JTL from an hour-long test is
+    # hundreds of megabytes per generator -- and it is set as a lifecycle rule
+    # on the bucket rather than enforced by a job that would have to list
+    # every object to find the old ones. Zero keeps them for ever, which some
+    # deployments have to.
+    artifact_retention_days: int = 90
+
     # Defaults exist so a unit test can build the application without them.
     # The compose values are the same because this is the development MinIO; a
     # deployment sets all of them.

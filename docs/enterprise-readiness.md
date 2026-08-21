@@ -316,6 +316,20 @@ a `SECURITY DEFINER` function that deletes dead families and nothing else. The
 alternative was a superuser credential living in the worker for the sake of
 one `DELETE`.
 
+Object storage was the third and largest: **496 MB** of raw JTL on the same
+development machine, and a real hour-long test writes hundreds of megabytes
+per generator. Artifacts now expire by a lifecycle rule on the bucket rather
+than by a job — a job would have to list every object to find the old ones,
+getting slower exactly as it became more necessary.
+
+That one nearly shipped broken twice over. MinIO refuses
+`PutBucketLifecycleConfiguration` without a `Content-Md5` header, which modern
+botocore no longer sends, so the rule was rejected and the refusal went only to
+a log line. And the test skipped on any `ClientError` — including "no
+configuration exists", the exact failure it was written for — so it reported
+success while nothing worked. It now skips only where a store cannot do this
+at all, and was verified to fail with the call removed.
+
 Audit logs are deliberately left alone. Deleting a compliance record by default
 is a worse failure than the disk it costs.
 

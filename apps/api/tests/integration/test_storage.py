@@ -60,3 +60,45 @@ def test_a_name_cannot_escape_its_prefix() -> None:
     """The agent names the artifact; the control plane decides where it lands."""
     with pytest.raises(ValueError):
         storage.artifact_key(uuid.uuid4(), 0, "../../etc/passwd")
+
+
+def test_artifacts_are_given_an_expiry() -> None:
+    """The largest thing this system produces, and nothing deleted one.
+
+    Half a gigabyte of JTL files had collected on a development machine
+    running nothing but the test suite; a real hour-long test writes hundreds
+    of megabytes per generator. The rule lives on the bucket rather than in a
+    job, because a job would have to list every object to find the old ones --
+    getting slower exactly as it became more necessary.
+    """
+    from botocore.exceptions import ClientError
+
+    from plimsoll_api.config import get_settings
+
+    storage.ensure_bucket()
+    try:
+        found = storage._client().get_bucket_lifecycle_configuration(
+            Bucket=get_settings().s3_bucket
+        )
+    except ClientError as exc:
+        code = exc.response.get("Error", {}).get("Code", "")
+        # Only a store that cannot do this at all is a skip. "No configuration
+        # exists" is the failure this test is for, and the first version
+        # skipped on both -- so it reported success while the rule was being
+        # rejected and the warning was going only to a log.
+        if code in ("NotImplemented", "MethodNotAllowed"):
+            pytest.skip(f"this object store has no lifecycle support: {exc}")
+        raise AssertionError(f"no expiry rule is configured on the bucket: {code}") from exc
+
+    rules = {rule["ID"]: rule for rule in found["Rules"]}
+    assert "plimsoll-artifacts" in rules, sorted(rules)
+    rule = rules["plimsoll-artifacts"]
+    assert rule["Status"] == "Enabled"
+    assert rule["Expiration"]["Days"] == get_settings().artifact_retention_days
+    # A failed upload leaves parts nothing will complete, and they are billed
+    # like storage because they are storage. Asserted only where the store
+    # reports it back: MinIO accepts the clause and does not return it, and
+    # demanding it here would be a test about MinIO rather than about this.
+    abort = rule.get("AbortIncompleteMultipartUpload")
+    if abort is not None:
+        assert abort["DaysAfterInitiation"] == 7
