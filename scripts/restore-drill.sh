@@ -7,6 +7,13 @@
 # the rows, the hypertable, and the row-level-security policies. A restored
 # database that came back without its policies would read clean and leak across
 # organisations.
+#
+# Two of these are here because they are the things a dump does not obviously
+# carry. TimescaleDB's retention policy lives in a background-job catalogue
+# rather than in the schema, so pg_dump does not write it out and a restored
+# database would start growing again with nobody told. The SECURITY DEFINER
+# functions are what login and the session purge go through; a restore missing
+# them reads clean and cannot authenticate anybody.
 set -euo pipefail
 
 COMPOSE="${COMPOSE:-docker compose -f infrastructure/docker/docker-compose.yml}"
@@ -27,7 +34,9 @@ for check in \
   "metrics:SELECT count(*) FROM performance_metrics" \
   "audit:SELECT count(*) FROM audit_logs" \
   "hypertables:SELECT count(*) FROM timescaledb_information.hypertables" \
-  "policies:SELECT count(*) FROM pg_policies"
+  "policies:SELECT count(*) FROM pg_policies" \
+  "retention:SELECT count(*) FROM timescaledb_information.jobs WHERE proc_name = 'policy_retention'" \
+  "authfns:SELECT count(*) FROM pg_proc WHERE proname LIKE 'auth\\_%' OR proname LIKE 'maintenance\\_%'"
 do
   name="${check%%:*}"
   sql="${check#*:}"
