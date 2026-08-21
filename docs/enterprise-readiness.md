@@ -2,19 +2,23 @@
 
 What is built, what holds it back, and in what order to fix it.
 
-Written after verifying the tree rather than reading the roadmap: every claim
-below was checked against the running system on 2026-08-20.
+Written after verifying the tree rather than reading the roadmap. First
+checked against the running system on 2026-08-20; re-checked on 2026-08-21,
+and the numbers below are from that run rather than remembered.
 
 ## Verified state
 
 | Gate | Result |
 | --- | --- |
-| `make dev` | Eight services from a clean machine |
+| `make dev` | Nine services from empty volumes, migrations at head |
 | `make lint` | Clean — Python and TypeScript |
 | `make typecheck` | Clean — mypy and tsc |
-| `make test` | 184 unit tests |
-| `make test-int` | 212 integration tests, real containers, real load |
+| `make test` | 298 unit tests |
+| `make test-int` | 318 integration tests, real containers, real load |
+| `make e2e` | 9 browser journeys |
 | `make contracts` | Idempotent, tree stays clean |
+| `make restore-drill` | Backup restored and compared, isolation intact |
+| `pip-audit`, `npm audit` | No known vulnerabilities |
 
 A test defined over the API runs across generator containers, JMeter generates
 load against the target, HDR sketches merge so percentiles are computed once,
@@ -22,11 +26,31 @@ errors group, SLA rules produce a verdict, the run streams live, and the raw
 artifacts come back. All of that is exercised by the integration suite, not
 asserted here.
 
-## What stops this being enterprise ready
+**One caveat on the browser suite.** It failed once in five runs during the
+final check and left no artefact behind, then passed three consecutive times.
+The cause is not known, so it is written here rather than called green.
 
-Ordered by what blocks adoption first, not by effort.
+## How the faults below were found
 
-### 1. Nothing enforced a gate until now
+Worth recording, because the method found more than reading the code did.
+
+Most of them came from asking a question of the running system rather than of
+the source: stopping a dependency to see what happened, looking at what was
+actually on disk or in Redis, or checking that a feature could be reached
+rather than that it existed. Several passed every test while being broken —
+an event nothing published, a lifecycle rule the object store rejected into a
+log line, probe paths that answered 404.
+
+Where a fix mattered, it was verified by breaking it again: removing a check
+and watching the right test fail. Three tests were found to be passing for the
+wrong reason that way, including one written the same day.
+
+## What stopped this being enterprise ready
+
+Ordered by what blocked adoption first, not by effort. Every item below is
+closed; what is not closed is at the end of this document, on its own.
+
+### 1. Nothing enforced a gate until now — closed
 
 There was no CI. Every check above existed only on a developer's machine, which
 means the only thing preventing a regression reaching `main` was somebody
@@ -145,7 +169,7 @@ that shipped.
 been run end to end on a cluster — that needs the generator image on the
 nodes. The launcher is verified; the journey through it is not yet.
 
-### 7. One organisation, one identity provider — half closed
+### 7. One organisation, one identity provider — closed
 
 **Fixed: there is now a user directory.** Until this, a user existed only if
 `seed.py` wrote one, so a second person needed a hand-written `INSERT`. That
@@ -435,20 +459,52 @@ production is the Helm chart, and that sets them.
 
 ## Order of work
 
-1. ~~Audit log read API~~ — done
-2. ~~Worker recovery and graceful shutdown~~ — done
-3. ~~Auth rate limiting~~ — done
-4. ~~Observability~~ — done
-5. ~~API keys with scopes~~ — done
-6. ~~Generator resource limits~~ — done
-7. ~~Kubernetes runtime and Helm chart~~ — done
-8. ~~User directory: invite, roles, offboarding~~ — done
-9. ~~Backup and restore; `make e2e`; the web interface's missing half~~ — done
-10. ~~Credential key rotation~~ — done
-11. ~~Pin the generator pool in the run snapshot~~ — done
-12. ~~OIDC single sign-on~~ — done
-13. Organisations as a product surface; roles beyond two
-14. A load test end to end on Kubernetes; Terraform
+1. ~~Audit log read API~~
+2. ~~Worker recovery and graceful shutdown~~
+3. ~~Auth rate limiting~~
+4. ~~Observability~~
+5. ~~API keys with scopes~~
+6. ~~Generator resource limits~~
+7. ~~Kubernetes runtime and Helm chart~~
+8. ~~User directory: invite, roles, offboarding~~
+9. ~~Backup and restore; `make e2e`; the web interface's missing half~~
+10. ~~Credential key rotation~~
+11. ~~Pin the generator pool in the run snapshot~~
+12. ~~OIDC single sign-on~~
+13. ~~Organisations as a product surface; roles beyond two~~
+14. ~~Retention: metrics, sessions, artifacts, Redis streams~~
+15. ~~Resilience: a dependency being away is a pause, and answers 503~~
+16. ~~The worker off root; abandoned generators reaped~~
 
-Each is landed the way the rest of this repository was: a failing test first,
+Each was landed the way the rest of this repository was: a failing test first,
 the change, then the gates.
+
+## What is still outstanding
+
+Written plainly, because a list of everything that is done and nothing that is
+not would be the least useful part of this document.
+
+**A load test has never run end to end on Kubernetes.** The chart applies to a
+real API server, the runtime creates, sizes, finds and removes pods on one,
+and the RBAC boundary is asserted by asking the cluster. What has not happened
+is a run going all the way through on a cluster, because that needs the
+generator image on the nodes. The launcher is verified; the journey through it
+is not, and the probe paths that shipped wrong are a reminder of the
+difference between a manifest that applies and a deployment that works.
+
+**`infrastructure/terraform` is empty.** The Helm chart installs the control
+plane; nothing here provisions the cluster, the database, or the object store
+underneath it.
+
+**`PROJECT_ADMIN` from the data model does not exist.** Organisation roles run
+from `VIEWER` to `ORG_ADMIN`; project-scoped roles need a project resolved on
+every route, and none does. `SUPER_ADMIN` is deliberately absent: an
+instance-wide role would need a path around row-level security, and creating
+organisations is an operator's token instead.
+
+**Webhooks have no browser surface.** Users and single sign-on do; a
+subscription is still made over the API.
+
+**No general request rate limiting.** Failed sign-ins are throttled; nothing
+else is. On a deployment behind an ingress that is usually the ingress's job,
+and it is not this chart's yet.
