@@ -405,11 +405,33 @@ are named types rather than a broad `OSError`, so a genuine bug is still 500
 rather than hidden behind a retry loop, and `IntegrityError` stays 500 too
 because a row that breaks a constraint will break it identically for ever.
 
-### 8. Operational edges
+### 8. Operational edges — closed
 
-- The worker container runs as root to reach the Docker socket. Development
-  only, and commented as such, but it is the one container that does.
-- No resource limits on any compose service.
+**The worker no longer runs as root.** It was the one container running our
+own code as root, and root with a mounted Docker socket is root on the host.
+The reason given was that the socket's group id is not portable, which is
+true — it differs by distro and by how Docker was installed. But it is
+knowable at the moment it matters, so the Makefile reads it off the socket and
+passes it in. The process stays uid 10001 and joins the group that owns the
+socket, which is what the socket's permissions were asking for. Verified by
+running a full load test: provisioned, executed, judged PASS, and reaped.
+
+Postgres, Redis and MinIO run as root by their own images' design, and the two
+fixtures are development-only.
+
+**Abandoned generators are reaped.** Found by looking: a container seventeen
+hours old, exited, holding a deterministic name that a retry of that ordinal
+would have collided with. A run ending reaps its own, so the only ones left
+are from a worker killed mid-flight — a container the database never recorded
+and nothing afterwards looks for. The hourly pass now removes them, exited
+only and only after six hours, so a live run's generators are never touched.
+
+The first version looked at the runtimes the worker had already built, which
+is empty on a worker that has just started — exactly when the orphans from the
+one before it are lying around. It builds each configured runtime now.
+
+No resource limits on the compose services, which is a development concern:
+production is the Helm chart, and that sets them.
 
 ## Order of work
 

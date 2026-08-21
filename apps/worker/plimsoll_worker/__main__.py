@@ -63,7 +63,7 @@ from plimsoll_worker.events import (
     RUN_SLA_BREACHED,
     announce_run,
 )
-from plimsoll_worker.maintenance import purge_dead_sessions
+from plimsoll_worker.maintenance import purge_dead_sessions, reap_abandoned_generators
 from plimsoll_worker.metrics import merge_batch, write
 from plimsoll_worker.reconciler import Decision, GeneratorRow, RunView, decide, is_silent
 from plimsoll_worker.runtime.base import GeneratorHandle, GeneratorSpec
@@ -640,7 +640,7 @@ async def _survive_the_broker(
                 await asyncio.wait_for(stopping.wait(), timeout=BROKER_RETRY_SECONDS)
 
 
-async def _maintain(stopping: asyncio.Event) -> None:
+async def _maintain(orchestrator: Orchestrator, stopping: asyncio.Event) -> None:
     """Clear what nothing will read again, on a slow loop of its own.
 
     Once an hour rather than on a schedule anybody has to install: a
@@ -658,6 +658,30 @@ async def _maintain(stopping: asyncio.Event) -> None:
                 logger.info("cleared %d finished sign-in session(s)", removed)
         except Exception:
             logger.exception("clearing finished sessions failed")
+        # Every runtime, not only the ones already built. Clients are created
+        # on demand, so a worker that has just started has none -- and a
+        # worker that has just started is exactly when the orphans from the
+        # one before it are lying around.
+        for name in RUNTIMES:
+            try:
+                runtime = orchestrator.runtime(name)
+            except Exception as exc:
+                # A runtime this deployment does not have. Building a Docker
+                # client on a Kubernetes-only install fails here, and that is
+                # an answer rather than a fault -- said at debug so it is
+                # findable without being hourly noise.
+                logger.debug("no %s runtime on this deployment: %s", name, exc)
+                continue
+            try:
+                reaped = await reap_abandoned_generators(runtime)
+                if reaped:
+                    logger.warning(
+                        "removed %d abandoned %s generator(s) whose run ended unwatched",
+                        reaped,
+                        name,
+                    )
+            except Exception:
+                logger.exception("reaping abandoned %s generators failed", name)
         # Interruptible, so a shutdown does not wait out the hour.
         with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(stopping.wait(), timeout=MAINTENANCE_INTERVAL_SECONDS)
@@ -794,7 +818,7 @@ async def main() -> None:
             stopping,
             lambda: _reconcile_forever(bus, orchestrator, consumer, stopping),
         ),
-        _survive_the_broker("maintenance", stopping, lambda: _maintain(stopping)),
+        _survive_the_broker("maintenance", stopping, lambda: _maintain(orchestrator, stopping)),
         _survive_the_broker(
             "probes", stopping, lambda: _serve_probes(bus, orchestrator, consumer, stopping)
         ),

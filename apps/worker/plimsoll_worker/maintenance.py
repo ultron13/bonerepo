@@ -20,6 +20,8 @@ better at knowing which chunks are whole.
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
+from typing import Any
 
 import sqlalchemy as sa
 
@@ -31,6 +33,32 @@ logger = logging.getLogger(__name__)
 # A revoked family is kept briefly rather than removed at once: revocation is
 # the theft signal, and somebody looking into one wants the family still there
 # while they look.
+# Long enough that no live run could own an exited generator, short enough
+# that an orphan is gone before anybody trips over its name.
+ABANDONED_AFTER = timedelta(hours=6)
+
+
+async def reap_abandoned_generators(runtime: Any) -> int:
+    """Remove generators whose run ended while nothing was watching.
+
+    A run ending reaps its own, so this only finds the ones left by a worker
+    that died mid-flight: a container the database never recorded, that
+    nothing afterwards looks for, holding a deterministic name that a retry of
+    the same ordinal would collide with.
+
+    Only the Docker runtime has these. On Kubernetes a pod carries
+    activeDeadlineSeconds and the cluster ends it, which is the same idea
+    expressed by something better placed to do it.
+    """
+    finder = getattr(runtime, "abandoned", None)
+    if finder is None:
+        return 0
+    handles = await finder(ABANDONED_AFTER)
+    if handles:
+        await runtime.teardown(handles)
+    return len(handles)
+
+
 async def purge_dead_sessions() -> int:
     """Delete finished refresh families and their history. Returns the count.
 

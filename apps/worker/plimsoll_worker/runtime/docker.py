@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
 import docker
@@ -25,6 +26,9 @@ from plimsoll_worker.runtime.base import GeneratorHandle, GeneratorSpec, Generat
 # without the other is how a generator gets killed mid-run.
 DEFAULT_MEMORY_LIMIT = "2g"
 DEFAULT_CPU_LIMIT = 2.0
+
+RUN_LABEL = "plimsoll.run"
+ORDINAL_LABEL = "plimsoll.ordinal"
 
 
 class DockerRuntime:
@@ -42,8 +46,8 @@ class DockerRuntime:
             # to the row that should describe it without parsing its name.
             labels={
                 **spec.labels,
-                "plimsoll.run": str(spec.run_id),
-                "plimsoll.ordinal": str(spec.ordinal),
+                RUN_LABEL: str(spec.run_id),
+                ORDINAL_LABEL: str(spec.ordinal),
             },
             # Invariant 6. A lost generator is capacity loss and must surface as
             # such, never be papered over by a restart. Docker documents "no" as
@@ -79,11 +83,11 @@ class DockerRuntime:
 
     def _find(self, run_id: uuid.UUID) -> list[GeneratorHandle]:
         containers = self._client.containers.list(
-            all=True, filters={"label": f"plimsoll.run={run_id}"}
+            all=True, filters={"label": f"{RUN_LABEL}={run_id}"}
         )
         found = []
         for container in containers:
-            ordinal = container.labels.get("plimsoll.ordinal")
+            ordinal = container.labels.get(ORDINAL_LABEL)
             if ordinal is None:
                 continue
             found.append(GeneratorHandle(ordinal=int(ordinal), external_ref=str(container.id)))
@@ -99,6 +103,44 @@ class DockerRuntime:
         next attempt collides with it and the run cannot recover either.
         """
         return await asyncio.to_thread(self._find, run_id)
+
+    def _abandoned(self, older_than: timedelta) -> list[GeneratorHandle]:
+        cutoff = datetime.now(UTC) - older_than
+        found = []
+        for container in self._client.containers.list(all=True, filters={"label": RUN_LABEL}):
+            if container.status in ("created", "running", "restarting", "paused"):
+                # Never a live generator. A run that is still going is the
+                # reconciler's to end, not this.
+                continue
+            finished = (container.attrs.get("State") or {}).get("FinishedAt") or ""
+            try:
+                ended = datetime.fromisoformat(finished.replace("Z", "+00:00"))
+            except ValueError:
+                continue
+            if ended < cutoff:
+                found.append(
+                    GeneratorHandle(
+                        ordinal=int(container.labels.get(ORDINAL_LABEL) or 0),
+                        external_ref=str(container.id),
+                    )
+                )
+        return found
+
+    async def abandoned(self, older_than: timedelta) -> list[GeneratorHandle]:
+        """Generators that stopped long ago and were never removed.
+
+        A run ending reaps its own, so this only ever finds the ones whose run
+        ended while nothing was watching -- a worker killed mid-flight leaves a
+        container the database never recorded, and nothing afterwards is
+        looking for it. Found one seventeen hours old on a development
+        machine, holding a name that a retry of that ordinal would collide
+        with.
+
+        Exited only, and only after long enough that no live run could own it.
+        A running generator is never touched: ending one is the reconciler's
+        job and guessing at it here would stop a test that was working.
+        """
+        return await asyncio.to_thread(self._abandoned, older_than)
 
     def _inspect(self, handle: GeneratorHandle) -> GeneratorState:
         try:

@@ -1,6 +1,11 @@
 .PHONY: test lint typecheck format dev dev-down test-int e2e contracts backup restore-drill
 
 UV := uv run
+# The group that owns the Docker socket, read where it is known rather than
+# assumed. The worker joins it so it can create generators without being root,
+# and `make dev` stays one command on a machine that has only Docker.
+export PLIMSOLL_DOCKER_GID := $(shell stat -c '%g' /var/run/docker.sock 2>/dev/null || echo 0)
+
 COMPOSE := docker compose -f infrastructure/docker/docker-compose.yml
 # The web checks run in a container for the same reason the build does: the
 # promise is Docker and make, not a matching local Node.

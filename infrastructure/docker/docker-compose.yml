@@ -83,11 +83,20 @@ services:
       context: ../..
       dockerfile: infrastructure/docker/api.Dockerfile
     command: ["uv", "run", "python", "-m", "plimsoll_worker"]
-    # The socket is owned by root:docker, and the image's uid 10001 is in
-    # neither. Development only: the host's docker group id is not portable, and
-    # a deployment runs on Kubernetes, where the worker holds an API token
-    # instead of a socket and this override does not exist.
-    user: "0:0"
+    # The socket is owned by root:docker and the image's uid 10001 is in
+    # neither, so this used to run as root -- and root with a mounted Docker
+    # socket is root on the host, in the one container that is our own code.
+    #
+    # The group id was said to be unportable, and it is: it differs by distro
+    # and by how Docker was installed. But it is knowable at the moment it
+    # matters, so the Makefile reads it off the socket and passes it in. The
+    # process stays uid 10001 and joins the group that owns the socket, which
+    # is what the socket's permissions were asking for all along.
+    #
+    # A deployment runs on Kubernetes, where the worker holds an API token
+    # rather than a socket and none of this exists.
+    user: "10001:10001"
+    group_add: ["${PLIMSOLL_DOCKER_GID:-0}"]
     environment:
       PLIMSOLL_DATABASE_URL: postgresql+asyncpg://plimsoll_app:plimsoll_app_dev@postgres:5432/plimsoll
       PLIMSOLL_MIGRATION_DATABASE_URL: postgresql+asyncpg://plimsoll_owner:plimsoll_owner_dev@postgres:5432/plimsoll
