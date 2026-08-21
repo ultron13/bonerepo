@@ -193,6 +193,26 @@ rather than opened, and the cookie is `SameSite=lax` so it does not ride a
 cross-site request. Found while wiring single sign-on, which needs the same
 cookie.
 
+### 7c. Concurrency was only ever tested one call at a time — closed
+
+Idempotency was tested by repeating a call, which is not the question a CI
+fleet asks. Several pipelines start runs in the same second, a person
+double-clicks, and a retry lands beside the request it was retrying.
+Sequential idempotency and concurrent idempotency are different claims.
+
+**Verified, and it holds.** Eight simultaneous starts get eight distinct run
+numbers; simultaneous stops all answer 200; a stop racing a cancel leaves one
+ending; a duplicate invite gives one `201` and conflicts rather than a `500`.
+The tests use a barrier rather than a thread pool alone — handing work to a
+pool dispatches it in quick succession, which is not together, and the
+contention would never have happened.
+
+The run counter was already right, and proving the test could tell replaced it
+with `max(run_number) + 1` for one run: three of eight starts survived. That
+also left the counter behind the table it counts, which broke every start
+until it was repaired — so there is now a test asserting no counter has fallen
+behind its runs, because that failure arrives long after whatever caused it.
+
 ### 8. Operational edges
 
 - The worker container runs as root to reach the Docker socket. Development
