@@ -66,6 +66,7 @@ def create_app() -> FastAPI:
         script_repos,
         target_policy,
         users,
+        webhooks,
     )
     from plimsoll_api.routers.health import set_readiness_checks
 
@@ -76,6 +77,7 @@ def create_app() -> FastAPI:
     app.include_router(identity.router)
     app.include_router(oidc.router)
     app.include_router(users.router)
+    app.include_router(webhooks.router)
     app.include_router(projects.router)
     app.include_router(credentials.router)
     app.include_router(pools.router)

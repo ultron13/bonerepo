@@ -318,6 +318,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/webhooks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Webhooks */
+        get: operations["list_webhooks_api_v1_webhooks_get"];
+        put?: never;
+        /**
+         * Create Webhook
+         * @description The URL is resolved and every address it answers with is checked.
+         *
+         *     A webhook URL is supplied here and fetched by the control plane, which is
+         *     the shape of every server-side request forgery there has ever been --
+         *     refusing the obvious literals is not enough, because a name resolves, and
+         *     it resolves after it is checked.
+         */
+        post: operations["create_webhook_api_v1_webhooks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhooks/{webhook_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Webhook
+         * @description Idempotent: removing what is already gone is the outcome wanted.
+         */
+        delete: operations["delete_webhook_api_v1_webhooks__webhook_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects": {
         parameters: {
             query?: never;
@@ -1165,6 +1211,13 @@ export interface components {
             /** Nextcursor */
             nextCursor?: string | null;
         };
+        /** Page[Webhook] */
+        Page_Webhook_: {
+            /** Items */
+            items: components["schemas"]["Webhook"][];
+            /** Nextcursor */
+            nextCursor?: string | null;
+        };
         /** PlanSummaryResponse */
         PlanSummaryResponse: {
             /** Threadgroups */
@@ -1814,6 +1867,52 @@ export interface components {
             /** Plugins */
             plugins?: components["schemas"]["PluginSummary"][];
         };
+        /** Webhook */
+        Webhook: {
+            /** Id */
+            id: string;
+            /** Url */
+            url: string;
+            /** Events */
+            events: string[];
+            /** Status */
+            status: string;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+        };
+        /**
+         * WebhookCreated
+         * @description The one response carrying the secret. Shown once, like an API key.
+         */
+        WebhookCreated: {
+            /** Id */
+            id: string;
+            /** Url */
+            url: string;
+            /** Events */
+            events: string[];
+            /** Status */
+            status: string;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Secret */
+            secret: string;
+        };
+        /** WebhookInput */
+        WebhookInput: {
+            /** Url */
+            url: string;
+            /** Events */
+            events: ("audit.*" | "run.completed" | "run.failed" | "run.sla_breached")[];
+            /** Secret */
+            secret?: string | null;
+        };
         /** WorkloadSpec */
         WorkloadSpec: {
             /** Virtualusers */
@@ -2360,6 +2459,88 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["User"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_webhooks_api_v1_webhooks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_Webhook_"];
+                };
+            };
+        };
+    };
+    create_webhook_api_v1_webhooks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebhookInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_webhook_api_v1_webhooks__webhook_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                webhook_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

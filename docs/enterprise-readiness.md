@@ -213,6 +213,35 @@ also left the counter behind the table it counts, which broke every start
 until it was repaired — so there is now a test asserting no counter has fallen
 behind its runs, because that failure arrives long after whatever caused it.
 
+### 7d. Nothing left this system — closed
+
+`webhook_subscriptions` had a table and an ORM model and nothing else: no
+repository, no route, no delivery. An earlier sweep for unwired tables counted
+the model as a reference, which was too generous. The roadmap wants audit-log
+streaming into the SIEMs enterprises already run, and this is the vehicle.
+
+**Fixed:** subscriptions, HMAC-signed deliveries with the timestamp inside the
+signature, retries with backoff, and suspension for an endpoint that cannot be
+reached. Delivery runs in the worker on its own task, because somebody else's
+server answering at somebody else's pace has no business on the path of a
+request that already succeeded.
+
+The interesting part is where a webhook may point. A tenant supplies the URL
+and the control plane fetches it, which is server-side request forgery in its
+purest form. Refusing the obvious literals is not enough — a name resolves, and
+it resolves after it is checked — so the host is resolved, every address is
+checked, and the delivery connects to a checked address with the hostname
+carried in the Host header and in TLS.
+
+Two things were caught by checking rather than by reasoning. A test asserting
+that one private address among public ones is refused passed even with only
+the first address being checked, because the private one happened to sort
+first; it tests both orderings now. And `audit.*` matched nothing at all,
+because audit actions are named for what they did — `user.deactivated` — so the
+family computed was `user.*`. Nothing raised and nothing logged: the
+subscription simply never fired. Every unit and integration test passed. A
+smoke test against the running stack found it in one attempt.
+
 ### 8. Operational edges
 
 - The worker container runs as root to reach the Docker socket. Development

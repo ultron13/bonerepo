@@ -70,6 +70,50 @@ Run it on a schedule, not after an incident.
   run. Any that survive the incident are adopted or reaped by the worker.
 - **Redis streams.** See above.
 
+## Sending events to a SIEM
+
+An organisation subscribes to what happens here. `audit.*` is the whole trail,
+which is what a SIEM wants.
+
+```bash
+curl -X POST https://plimsoll.example.com/api/v1/webhooks \
+  -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"url": "https://siem.example.com/plimsoll", "events": ["audit.*"]}'
+```
+
+The response carries a secret, once. Every delivery is signed with it:
+
+```
+x-plimsoll-signature: sha256=<hmac>
+x-plimsoll-timestamp: <unix seconds>
+```
+
+The signature covers `"<timestamp>." + body`, so a receiver checking it is also
+checking the age. Reject anything older than a few minutes; a signature that
+does not cover the timestamp lets a captured delivery replay for as long as the
+secret lives. `plimsoll_api.security.webhooks.verify` is the procedure, and is
+what the tests use.
+
+**A URL must be https and must resolve to a public address.** A webhook URL is
+supplied by a tenant and fetched by the control plane, which is the shape of
+every server-side request forgery there has ever been — the metadata endpoint
+that hands out cloud credentials is one HTTP request away from anything that
+can be made to fetch a URL. The host is resolved, every address it answers with
+is checked, and the delivery connects to a checked address rather than
+resolving the name a second time. A name that answers publicly when it is
+checked and privately when it is used is the whole attack.
+
+`PLIMSOLL_WEBHOOK_ALLOW_PRIVATE_ADDRESSES` permits private addresses, because
+an on-premises SIEM is a real deployment. It belongs on a single-tenant
+install: on a shared one it lets any organisation point a webhook at anything
+the control plane can reach. Loopback and link-local stay refused either way.
+
+**A receiver that cannot be reached is suspended**, after three attempts over
+about ten seconds. Left active, a dead endpoint turns every event into a queue
+of attempts that never drains, and the queue is what gets noticed rather than
+the endpoint. A 4xx other than 408 or 429 is not retried at all: that is the
+receiver saying it understood and declined.
+
 ## Single sign-on
 
 An organisation configures one identity provider. Anyone with `admin.system`

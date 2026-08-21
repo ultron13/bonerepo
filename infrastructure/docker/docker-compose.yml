@@ -59,6 +59,11 @@ services:
       # The provider fixture is a container on a private network with no
       # certificate. A deployment leaves this off and uses https.
       PLIMSOLL_OIDC_ALLOW_INSECURE_ISSUER: "true"
+      # A webhook may reach a private address here. That is a real deployment
+      # shape -- an on-premises SIEM sits on the same network -- and it is off
+      # by default because on a shared instance it lets any tenant point a
+      # webhook at anything the control plane can reach.
+      PLIMSOLL_WEBHOOK_ALLOW_PRIVATE_ADDRESSES: "true"
       PLIMSOLL_CORS_ORIGINS: http://localhost:3000
     ports: ["8000:8000"]
     depends_on:

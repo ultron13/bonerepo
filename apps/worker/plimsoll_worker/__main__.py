@@ -28,6 +28,8 @@ from plimsoll_api.messaging import (
     METRICS_INGESTION,
     POOL_PROBES,
     RUNS_EXECUTION,
+    WEBHOOK_DELIVERIES,
+    WEBHOOK_GROUP,
     WORKER_GROUP,
     Delivery,
     RedisStreamBus,
@@ -61,6 +63,7 @@ from plimsoll_worker.runtime.base import GeneratorHandle, GeneratorSpec
 from plimsoll_worker.runtime.docker import DockerRuntime
 from plimsoll_worker.runtime.kubernetes import KubernetesRuntime
 from plimsoll_worker.serving import serve
+from plimsoll_worker.webhooks import deliver as deliver_event
 
 TICK_SECONDS = 2
 # The probe consumer's own block. The API waits five seconds for an answer, so
@@ -552,6 +555,27 @@ async def _serve_probes(
             await bus.acknowledge(POOL_PROBES, WORKER_GROUP, delivery)
 
 
+async def _deliver_webhooks(bus: RedisStreamBus, consumer: str, stopping: asyncio.Event) -> None:
+    """Send events onward, on its own task.
+
+    Somebody else's server answering at somebody else's pace, so it gets a
+    task of its own rather than a place in a queue that also carries runs.
+    Every delivery is acknowledged whatever the outcome: retries and the
+    decision to give up belong to the delivery itself, and a message left
+    unacknowledged would be redelivered on top of them.
+    """
+    while not stopping.is_set():
+        deliveries = await bus.read(
+            WEBHOOK_DELIVERIES, WEBHOOK_GROUP, consumer, count=20, block_ms=1000
+        )
+        for delivery in deliveries:
+            try:
+                await deliver_event(delivery.payload)
+            except Exception:
+                logger.exception("delivering %s failed", delivery.payload.get("event"))
+            await bus.acknowledge(WEBHOOK_DELIVERIES, WEBHOOK_GROUP, delivery)
+
+
 async def _ingest_metrics(bus: RedisStreamBus, consumer: str, stopping: asyncio.Event) -> None:
     """Merge sketches and write them, on its own task.
 
@@ -656,6 +680,7 @@ async def main() -> None:
     await bus.ensure_group(RUNS_EXECUTION, WORKER_GROUP)
     await bus.ensure_group(POOL_PROBES, WORKER_GROUP)
     await bus.ensure_group(METRICS_INGESTION, METRICS_GROUP)
+    await bus.ensure_group(WEBHOOK_DELIVERIES, WEBHOOK_GROUP)
     orchestrator = Orchestrator()
     consumer = f"worker-{socket.gethostname()}"
     # SIGTERM is how an orchestrator asks a process to stop, and how a
@@ -668,13 +693,15 @@ async def main() -> None:
         with contextlib.suppress(NotImplementedError):
             loop.add_signal_handler(received, _stop(stopping, received))
 
-    # Three loops, one process: a long reconciliation must never delay a probe,
-    # a probe must never delay a run, and a burst of metrics must delay
-    # neither.
+    # Four loops, one process: a long reconciliation must never delay a probe,
+    # a probe must never delay a run, a burst of metrics must delay neither,
+    # and a webhook endpoint taking ten seconds to answer must delay nothing
+    # at all.
     work = asyncio.gather(
         _reconcile_forever(bus, orchestrator, consumer, stopping),
         _serve_probes(bus, orchestrator, consumer, stopping),
         _ingest_metrics(bus, consumer, stopping),
+        _deliver_webhooks(bus, consumer, stopping),
         serve(SERVE_PORT, stopping),
     )
     try:

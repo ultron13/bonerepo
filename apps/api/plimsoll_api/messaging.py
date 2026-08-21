@@ -30,11 +30,16 @@ POOL_PROBES = "pools.probe"
 # Sketches on their way from generators to the merge. Kept off the execution
 # stream: metrics are high volume and a slow merge must never delay a run.
 METRICS_INGESTION = "metrics.ingestion"
+# Events on their way out of this system. A stream rather than a call from the
+# request that caused it: a slow or dead receiver must not make the action
+# that produced the event slow or fail. What happened has already happened.
+WEBHOOK_DELIVERIES = "webhooks.deliveries"
 # Grouped failures. Same loop as the metrics, distinguished by `kind`: one
 # consumer group is simpler than two for data that arrives together.
 ERRORS_KIND = "error"
 WORKER_GROUP = "orchestrators"
 METRICS_GROUP = "metrics"
+WEBHOOK_GROUP = "webhooks"
 
 
 def run_channel(run_id: Any) -> str:

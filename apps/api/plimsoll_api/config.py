@@ -39,6 +39,18 @@ class Settings(BaseSettings):
     # private network with no certificate.
     oidc_allow_insecure_issuer: bool = False
 
+    # A webhook URL is supplied by a tenant and fetched by the control plane,
+    # so by default it may only reach a public address -- otherwise it is a
+    # way to read this deployment's own network, including the metadata
+    # endpoint that hands out cloud credentials.
+    #
+    # Off by default and genuinely needed by some deployments: an on-premises
+    # SIEM is often on the same private network. Turning it on means every
+    # organisation on this instance can point a webhook at anything the
+    # control plane can reach, so it belongs on a single-tenant install and
+    # not on a shared one.
+    webhook_allow_private_addresses: bool = False
+
     # Defaults exist so a unit test can build the application without them.
     # The compose values are the same because this is the development MinIO; a
     # deployment sets all of them.
