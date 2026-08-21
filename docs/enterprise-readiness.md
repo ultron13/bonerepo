@@ -127,6 +127,20 @@ the generators running against somebody's system.
 **Fixed:** the pool is pinned, and every runtime call resolves through what
 the run pinned rather than what the pool says now.
 
+**One bug in it shipped and was found later.** The chart's readiness and
+liveness probes pointed at `/api/v1/health/ready` and `/api/v1/health/live`;
+the API serves `/readyz` and `/healthz`. On a real cluster the readiness probe
+would never have succeeded, so the Service would have had no endpoints and the
+deployment would never have served anything, while the liveness probe
+restarted the pods into a crash loop.
+
+The chart had been "verified against a live cluster" and that claim was too
+broad: `--dry-run=server` and an install whose images cannot be pulled
+validate the shape of a manifest and never run a probe. Structure was checked;
+behaviour was not, and a probe is behaviour. A test now reads the probe paths
+out of the chart and makes the request, and was confirmed to fail on the paths
+that shipped.
+
 **Still open:** `infrastructure/terraform` is empty, and no full load test has
 been run end to end on a cluster — that needs the generator image on the
 nodes. The launcher is verified; the journey through it is not yet.

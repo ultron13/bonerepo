@@ -28,10 +28,10 @@ spec:
           # same check for both turns a slow dependency into a restart loop,
           # which is how a database blip becomes an outage.
           readinessProbe:
-            httpGet: { path: /api/v1/health/ready, port: http }
+            httpGet: { path: /readyz, port: http }
             periodSeconds: 5
           livenessProbe:
-            httpGet: { path: /api/v1/health/live, port: http }
+            httpGet: { path: /healthz, port: http }
             periodSeconds: 15
             failureThreshold: 4
           resources:
