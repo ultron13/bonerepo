@@ -52,9 +52,11 @@ repurposed. The v0.1 catalogue:
 | `UNAUTHENTICATED` | 401 | Missing or invalid credentials |
 | `PERMISSION_DENIED` | 403 | Authenticated, but not permitted to do this |
 | `NOT_FOUND` | 404 | Absent — or outside the caller's organisation, indistinguishable by design |
-| `CONFLICT` | 409 | Optimistic-lock `version` mismatch on a concurrent edit |
+| `METHOD_NOT_ALLOWED` | 405 | The path exists, but not for this method |
+| `CONFLICT` | 409 | Optimistic-lock `version` mismatch on a concurrent edit, or a uniqueness clash |
+| `RESOURCE_IN_USE` | 409 | Another resource references this one and it cannot be deleted; `details` names the referents |
 | `IDEMPOTENCY_KEY_REUSED` | 409 | Same `Idempotency-Key`, different payload |
-| `TEST_NOT_RUNNABLE` | 422 | Preflight failed; `details` carries every failing check |
+| `TEST_NOT_RUNNABLE` | 422 | A run was requested for a test that fails preflight; `details` carries every failing check. `POST /tests/{id}/validate` never returns this — it answers `200` with the report |
 | `TARGET_NOT_ALLOWED` | 422 | A resolved target host is outside the organisation's allowlist |
 | `INSUFFICIENT_CAPACITY` | 422 | No generator pool can supply the requested virtual users |
 | `REPO_UNREACHABLE` | 422 | Git host or credential failure during verify or ref resolution |
@@ -102,6 +104,19 @@ PATCH  /projects/{id}
 DELETE /projects/{id}
 ```
 
+### Credentials
+```http
+GET    /credentials
+POST   /credentials
+DELETE /credentials/{id}
+```
+
+A credential is written once and never read back: the response carries id,
+name, kind, and creation time, and no endpoint returns the secret. There is
+deliberately no `GET /credentials/{id}` — a per-credential read is where a
+"reveal" parameter would eventually be added. Deleting one that a script
+repository still references returns `RESOURCE_IN_USE`.
+
 ### Script repositories
 ```http
 GET    /projects/{projectId}/script-repos
@@ -123,6 +138,17 @@ tries to run it. Validation runs against the repository's `plimsoll.yaml`
 manifest where present; [script repositories](07-script-repos.md) defines the
 contract.
 
+`verify` reports; it does not reject. A reachable repository returns `200` with
+every finding at once, each one a `code`, a `severity`, and a message, so a
+tester fixes the set rather than discovering them one request at a time.
+`REPO_UNREACHABLE` is reserved for not reaching Git at all — an unknown host, a
+credential Git refuses, or a ref that does not resolve.
+
+`POST /script-repos/{id}/versions` pins a ref to the commit it names. It is
+idempotent: pinning a commit already pinned for the same plan path returns `200`
+and the existing version rather than creating a duplicate; a new pin returns
+`201`.
+
 ### Performance tests
 ```http
 GET    /projects/{projectId}/tests
@@ -132,13 +158,37 @@ PATCH  /tests/{id}
 DELETE /tests/{id}
 
 POST   /tests/{id}/validate     # preflight without running
-POST   /tests/{id}/clone
-POST   /tests/{id}/schedule
-POST   /tests/{id}/runs         # start a run
+POST   /tests/{id}/clone        # later slice
+POST   /tests/{id}/schedule     # later slice
+POST   /tests/{id}/runs         # start a run — later slice
 ```
 
+A test is one document. Its workload, its plans, and its SLA rules are created,
+read, and replaced together; there are deliberately no endpoints for a plan or a
+rule on its own, because a rule that outlives the test it constrains is a bug
+waiting to be found.
+
 `PATCH /tests/{id}` requires the current `version` and returns `409` on a
-concurrent edit rather than overwriting.
+concurrent edit rather than overwriting. A `plans` or `slaRules` key absent from
+the body leaves that collection alone; sending `[]` clears it.
+
+`POST /tests/{id}/validate` answers whether the test will run, and returns `200`
+whenever the test exists — the report is the answer, not an error. It carries an
+`ok` and a list of checks, one per code, each `PASS`, `FAIL`, or `SKIPPED`:
+
+| Check | Fails when |
+| --- | --- |
+| `TEST_STRUCTURE` | There is no plan, or the plans' virtual users do not add up to the workload's |
+| `SCRIPT_REF` | A plan's ref does not resolve in its repository |
+| `PLAN_PARSES` | A plan cannot be read or parsed at that commit |
+| `VARIABLES_PRESENT` | A variable the plan references has no stored value |
+| `TARGET_ALLOWED` | A resolved target host is outside the target policy allowlist |
+| `CAPACITY` | The pool has fewer free virtual users than the test asks for |
+
+Every check runs and every result is reported: validation that refuses to name
+the second problem until the first is fixed is what this endpoint exists to
+avoid. A check whose input never arrived reports `SKIPPED` rather than
+disappearing, so the list always carries all six codes.
 
 ### Runs
 ```http

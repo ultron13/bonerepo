@@ -19,6 +19,9 @@ _STATUS_TO_CODE = {
     401: ErrorCode.UNAUTHENTICATED,
     403: ErrorCode.PERMISSION_DENIED,
     404: ErrorCode.NOT_FOUND,
+    # A path that exists for another method. Without this the fallback below
+    # turns a 405 into a 500, which reports a client mistake as a server fault.
+    405: ErrorCode.METHOD_NOT_ALLOWED,
     409: ErrorCode.CONFLICT,
     422: ErrorCode.VALIDATION_FAILED,
     429: ErrorCode.RATE_LIMITED,

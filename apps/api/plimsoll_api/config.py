@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     redis_url: str
     s3_endpoint: str
     jwt_secret: str
+    # Encrypts the credentials table. No default: a built-in key is the same as
+    # no encryption, discovered later.
+    credential_key: str
 
     access_token_ttl_seconds: int = 900
     refresh_token_ttl_seconds: int = 1_209_600

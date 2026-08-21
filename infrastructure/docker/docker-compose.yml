@@ -46,12 +46,27 @@ services:
       PLIMSOLL_REDIS_URL: redis://redis:6379/0
       PLIMSOLL_S3_ENDPOINT: http://minio:9000
       PLIMSOLL_JWT_SECRET: development-only-secret-change-me
+      # 32 bytes, base64url. Development only; a deployment generates its own.
+      PLIMSOLL_CREDENTIAL_KEY: ZGV2ZWxvcG1lbnQtb25seS1rZXktMzItYnl0ZXMhISE=
       PLIMSOLL_ENVIRONMENT: development
     ports: ["8000:8000"]
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
       minio: {condition: service_healthy}
+      script-fixture: {condition: service_healthy}
+
+  script-fixture:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/script-fixture.Dockerfile
+    ports: ["8081:80"]
+    healthcheck:
+      # 127.0.0.1, not localhost: nginx listens on IPv4 and localhost resolves
+      # to ::1 first, which would fail a healthy container.
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/public/plans.git/info/refs?service=git-upload-pack"]
+      interval: 3s
+      retries: 20
 
   demo-target:
     build:

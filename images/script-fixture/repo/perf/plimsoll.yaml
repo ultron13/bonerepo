@@ -1,0 +1,13 @@
+version: 1
+engine: jmeter
+
+jmeter:
+  version: "5.6.3"
+
+plans:
+  - path: checkout.jmx
+    data:
+      - path: data/users.csv
+    variables:
+      - API_HOST
+      - API_TOKEN
