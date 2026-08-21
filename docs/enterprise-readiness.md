@@ -293,6 +293,32 @@ consumer that has stalled, not the normal path — and a consumer far enough
 behind to be trimmed has lost a window of metrics, which the ingestion path
 already treats as degraded reporting rather than a failed run.
 
+### 7g. The database grew without bound too — closed
+
+Having found the Redis streams uncapped, the same question of Postgres found
+the same answer. `performance_metrics` is a hypertable with no retention
+policy: an hour-long test at five hundred virtual users writes a row per
+transaction per generator per window, and nothing ever removed one. And
+nothing cleared finished sign-in sessions — 5,231 refresh families and 5,256
+history rows on a development machine two days old.
+
+**Fixed:** a ninety-day retention policy on the metrics hypertable, and an
+hourly pass in the worker that clears dead sessions. Verified by ageing three
+revoked families and watching the worker clear exactly those three.
+
+Compression was the obvious companion to retention and is **not** enabled:
+TimescaleDB refuses it on a table with row-level security. That is a real cost
+— roughly an order of magnitude of storage — paid for the tenant boundary, and
+it is written down so the next person meets the trade rather than the error.
+
+The purge crosses organisations, which forced RLS refuses, so it goes through
+a `SECURITY DEFINER` function that deletes dead families and nothing else. The
+alternative was a superuser credential living in the worker for the sake of
+one `DELETE`.
+
+Audit logs are deliberately left alone. Deleting a compliance record by default
+is a worse failure than the disk it costs.
+
 ### 8. Operational edges
 
 - The worker container runs as root to reach the Docker socket. Development

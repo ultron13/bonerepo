@@ -42,9 +42,8 @@ os.environ["PLIMSOLL_S3_ENDPOINT"] = os.environ.get(
     "http://localhost:9000",
 )
 
-from plimsoll_api import storage
+from plimsoll_api import messaging, storage
 from plimsoll_api.config import get_settings
-from plimsoll_api import messaging
 from plimsoll_api.db import session as db_session
 from plimsoll_api.security import secrets
 

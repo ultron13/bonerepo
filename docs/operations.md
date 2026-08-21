@@ -70,6 +70,36 @@ Run it on a schedule, not after an incident.
   run. Any that survive the incident are adopted or reaped by the worker.
 - **Redis streams.** See above.
 
+## What is kept, and for how long
+
+Nothing here grew without a bound until it was made to, and the three answers
+are deliberately different.
+
+**Metrics** are dropped after ninety days by a TimescaleDB retention policy
+(`PLIMSOLL_METRICS_RETENTION` at migration time). An hour-long test at five
+hundred virtual users writes a row per transaction per generator per window,
+so this is the table that fills a disk. What ages out is the per-window
+detail; the runs, their SLA verdicts and their merged summaries are ordinary
+rows and are kept — those are the results, and what goes is the working.
+
+Compression is **not** enabled, and not by preference: TimescaleDB refuses it
+on a table with row-level security, and row-level security is the tenant
+boundary. It would store these rows roughly an order of magnitude smaller, so
+this is a real cost paid for a guarantee worth more than the disk.
+
+**Sign-in sessions** are cleared by the worker, hourly. A refresh family is
+written on every sign-in and its history grows once per rotation; neither is
+read after the family is dead. A revoked family is kept a week, because
+revocation is the theft signal and somebody investigating one wants it still
+there.
+
+**Audit logs are never deleted**, deliberately. They are a compliance record,
+and an organisation that needed seven years and got ninety days finds out at
+exactly the wrong moment. They are small — a few hundred megabytes a year at
+enterprise volumes — and the webhook export above exists so the durable copy
+can live in a system built for keeping things. If a retention rule is required,
+it is a decision to make explicitly rather than a default to inherit.
+
 ## Sending events to a SIEM
 
 An organisation subscribes to what happens here. `audit.*` is the whole trail,

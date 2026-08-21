@@ -63,6 +63,7 @@ from plimsoll_worker.events import (
     RUN_SLA_BREACHED,
     announce_run,
 )
+from plimsoll_worker.maintenance import purge_dead_sessions
 from plimsoll_worker.metrics import merge_batch, write
 from plimsoll_worker.reconciler import Decision, GeneratorRow, RunView, decide, is_silent
 from plimsoll_worker.runtime.base import GeneratorHandle, GeneratorSpec
@@ -83,6 +84,8 @@ METRICS_BATCH = 500
 # loops finish the tick they are in and stop; anything longer than this and the
 # kill arrives first, which is the case adoption exists to survive.
 SHUTDOWN_GRACE_SECONDS = 20
+# Hourly. Nothing here is urgent, and a loop that runs often costs a query.
+MAINTENANCE_INTERVAL_SECONDS = 3600
 # Where a scraper and a liveness probe find the worker. It serves nothing else.
 SERVE_PORT = int(os.environ.get("PLIMSOLL_WORKER_PORT", "9100"))
 # How much longer than the run an agent's credential stays valid. It covers
@@ -604,6 +607,29 @@ async def _deliver_webhooks(bus: RedisStreamBus, consumer: str, stopping: asynci
             await bus.acknowledge(WEBHOOK_DELIVERIES, WEBHOOK_GROUP, delivery)
 
 
+async def _maintain(stopping: asyncio.Event) -> None:
+    """Clear what nothing will read again, on a slow loop of its own.
+
+    Once an hour rather than on a schedule anybody has to install: a
+    deployment should not need a cron entry to stop a table growing for ever,
+    and an operator who never reads this file should still not find one.
+
+    Failure here is logged and the loop continues. Maintenance falling behind
+    is a table that is larger than it should be; maintenance taking the worker
+    down is every run stopping.
+    """
+    while not stopping.is_set():
+        try:
+            removed = await purge_dead_sessions()
+            if removed:
+                logger.info("cleared %d finished sign-in session(s)", removed)
+        except Exception:
+            logger.exception("clearing finished sessions failed")
+        # Interruptible, so a shutdown does not wait out the hour.
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(stopping.wait(), timeout=MAINTENANCE_INTERVAL_SECONDS)
+
+
 async def _ingest_metrics(bus: RedisStreamBus, consumer: str, stopping: asyncio.Event) -> None:
     """Merge sketches and write them, on its own task.
 
@@ -721,12 +747,13 @@ async def main() -> None:
         with contextlib.suppress(NotImplementedError):
             loop.add_signal_handler(received, _stop(stopping, received))
 
-    # Four loops, one process: a long reconciliation must never delay a probe,
+    # Five loops, one process: a long reconciliation must never delay a probe,
     # a probe must never delay a run, a burst of metrics must delay neither,
     # and a webhook endpoint taking ten seconds to answer must delay nothing
     # at all.
     work = asyncio.gather(
         _reconcile_forever(bus, orchestrator, consumer, stopping),
+        _maintain(stopping),
         _serve_probes(bus, orchestrator, consumer, stopping),
         _ingest_metrics(bus, consumer, stopping),
         _deliver_webhooks(bus, consumer, stopping),
