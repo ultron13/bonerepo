@@ -182,7 +182,8 @@ export interface VerifyReport {
   findings: VerifyFinding[];
 }
 
-export type OrgRole = "ORG_ADMIN" | "VIEWER";
+export type OrgRole =
+  "ORG_ADMIN" | "PERFORMANCE_ENGINEER" | "TESTER" | "VIEWER";
 
 export interface User {
   id: string;

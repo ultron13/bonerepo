@@ -80,3 +80,34 @@ async def test_an_announcement_reaches_a_listener() -> None:
             break
 
     assert received == [{"command": "stop"}]
+
+
+async def test_a_stream_does_not_grow_without_bound(
+    stream: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Acknowledging does not remove an entry.
+
+    Redis keeps what it was given until something trims it, so a stream that
+    nothing caps grows in one direction only, and the end of that is an
+    eviction or an out-of-memory that takes the control plane with it. Found
+    at ninety-seven thousand entries on a development machine.
+
+    A small cap is set for this stream so the trimming actually happens.
+    Asserting against the real cap would pass whether or not a cap existed,
+    which is the shape of test that reports success for years and means
+    nothing -- ten thousand entries is not something to write in a test, and
+    not writing them is not evidence of anything either.
+    """
+    from plimsoll_api import messaging
+
+    monkeypatch.setitem(messaging.STREAM_CAPS, stream, 20)
+    bus = messaging.get_bus()
+    for index in range(400):
+        await bus.publish(stream, {"n": str(index)})
+
+    length = await bus.client.xlen(stream)
+    assert length > 0, "the premise: entries were written"
+    # Approximate trimming keeps at least the cap and lets the stream run over
+    # it between radix nodes, so this is bounded rather than exact. Four
+    # hundred entries against a cap of twenty is far outside that slack.
+    assert length < 400, f"nothing was trimmed: {length} entries survived 400 writes"

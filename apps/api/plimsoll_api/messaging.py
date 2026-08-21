@@ -41,6 +41,12 @@ WORKER_GROUP = "orchestrators"
 METRICS_GROUP = "metrics"
 WEBHOOK_GROUP = "webhooks"
 
+# How many entries a stream keeps. Sized by how fast each fills rather than by
+# how important it is: metrics arrive from every generator every few seconds,
+# and the rest arrive when somebody does something.
+DEFAULT_STREAM_CAP = 10_000
+STREAM_CAPS = {METRICS_INGESTION: 200_000}
+
 
 def run_channel(run_id: Any) -> str:
     """Commands for one run's agents. Namespaced so a listener cannot subscribe
@@ -102,7 +108,25 @@ class RedisStreamBus:
         # redis-py's stub is invariant in the field/value dict and, with
         # decode_responses=True, still types the id as `bytes | str`; both are
         # library-typing gaps, not ambiguity about what xadd actually returns.
-        message_id = await self._client.xadd(stream, cast(dict[Any, Any], payload))
+        message_id = await self._client.xadd(
+            stream,
+            cast(dict[Any, Any], payload),
+            # A stream nothing trims grows for ever. Every consumer here
+            # acknowledges, but acknowledgement does not remove an entry --
+            # Redis keeps it until something says otherwise, so the memory
+            # only goes one way and the end of that is an eviction or an OOM
+            # that takes the control plane with it.
+            #
+            # Approximate, because exact trimming walks the stream on every
+            # add and this is the hot path for metrics. The cap is a backstop
+            # for a consumer that has stalled, not the normal path: entries
+            # are read within seconds. A consumer far enough behind to be
+            # trimmed has lost data, and losing a window of metrics is
+            # degraded reporting rather than a failed run -- which is what the
+            # ingestion path already says about a batch it cannot write.
+            maxlen=STREAM_CAPS.get(stream, DEFAULT_STREAM_CAP),
+            approximate=True,
+        )
         return cast(str, message_id)
 
     async def ensure_group(self, stream: str, group: str) -> None:

@@ -176,8 +176,24 @@ The redirect no longer carries a token at all. The callback sets the refresh
 cookie and the landing page trades it for an access token, so nothing valid
 sits in browser history.
 
-**Still open:** organisations as a product surface — creating one, and roles
-beyond `ORG_ADMIN` and `VIEWER`.
+**Roles: partly closed.** Two roles is a switch, not least privilege. The
+distinction an organisation needs is between changing what runs, running it,
+and changing who has access — and the last must not come free with either of
+the others. `TESTER` and `PERFORMANCE_ENGINEER` sit between the two that
+existed: a pipeline that can edit a threshold can make a failing run pass,
+which is the one thing a gate must not be able to do.
+
+The routes already asked for permissions rather than roles, so this was a
+question of what each role holds rather than a change to any endpoint — which
+is also why the map is asserted directly, in a unit test and again over HTTP.
+A permission map is only true if the routes read it, and no unit test can tell
+whether they do.
+
+**Still open:** `SUPER_ADMIN` and `PROJECT_ADMIN` from the data model. The
+first is instance-wide and this map is organisation-wide; the second needs a
+project to be scoped to, and no route resolves one yet. Also outstanding:
+organisations as a product surface — there is still no way to create one
+without a database client.
 
 ### 7b. Refresh tokens were unreachable from the browser — closed
 
@@ -259,6 +275,23 @@ the names the contract advertises and checks each against what the code
 publishes. It was verified to bite by adding a name nothing produces. Its own
 premise is asserted too — it looks for absence, and a path that reads nothing
 would find every name absent, or, once the names matched, nothing at all.
+
+### 7f. Every Redis stream grew without bound — closed
+
+`xadd` was called with no `maxlen`, so nothing ever trimmed. Acknowledging a
+message does not remove it: Redis keeps what it was given until something says
+otherwise, so the memory only goes one way and the end of that is an eviction
+or an out-of-memory that takes the control plane down with it.
+
+Found at **96,828 entries** on `metrics.ingestion` on a development machine
+that has done nothing but run this test suite.
+
+**Fixed:** an approximate cap per stream, sized by how fast each fills rather
+than by how much each matters. Approximate because exact trimming walks the
+stream on every add and metrics is the hot path. The cap is a backstop for a
+consumer that has stalled, not the normal path — and a consumer far enough
+behind to be trimmed has lost a window of metrics, which the ingestion path
+already treats as degraded reporting rather than a failed run.
 
 ### 8. Operational edges
 

@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 # The roles v0.1 issues. A Literal rather than free text, because a typo in a
 # role name would otherwise create a user who holds nothing and looks fine.
-OrgRole = Literal["ORG_ADMIN", "VIEWER"]
+OrgRole = Literal["ORG_ADMIN", "PERFORMANCE_ENGINEER", "TESTER", "VIEWER"]
 UserStatus = Literal["ACTIVE", "SUSPENDED"]
 
 

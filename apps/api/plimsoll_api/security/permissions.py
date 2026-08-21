@@ -31,8 +31,31 @@ READ_PERMISSIONS = frozenset(
     {Permission.PROJECT_READ, Permission.SCRIPT_READ, Permission.TEST_READ}
 )
 
+# The line that matters is `admin.system`: issuing credentials, reading the
+# trail, and changing who is in the organisation. Nothing below ORG_ADMIN
+# holds it, and no combination of the others adds up to it.
+#
+# The rest separates changing what runs from running it. A pipeline that can
+# edit a threshold can make a failing run pass, which is the one thing a gate
+# must not be able to do -- so TESTER executes and writes nothing.
+#
+# `SUPER_ADMIN`, `PROJECT_ADMIN` and `SERVICE_ACCOUNT` are in the data model
+# and deliberately absent here. The first is an instance-wide role and this
+# map is organisation-wide; the second needs a project to be scoped to, which
+# no route resolves yet; the third is what an API key already is, and its
+# scopes are read instead of a role.
 ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
     "ORG_ADMIN": frozenset(Permission),
+    "PERFORMANCE_ENGINEER": READ_PERMISSIONS
+    | frozenset(
+        {
+            Permission.PROJECT_WRITE,
+            Permission.SCRIPT_WRITE,
+            Permission.TEST_WRITE,
+            Permission.TEST_EXECUTE,
+        }
+    ),
+    "TESTER": READ_PERMISSIONS | frozenset({Permission.TEST_EXECUTE}),
     "VIEWER": READ_PERMISSIONS,
 }
 

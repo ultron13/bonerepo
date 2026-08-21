@@ -1771,7 +1771,7 @@ export interface components {
              * Orgrole
              * @enum {string}
              */
-            orgRole: "ORG_ADMIN" | "VIEWER";
+            orgRole: "ORG_ADMIN" | "PERFORMANCE_ENGINEER" | "TESTER" | "VIEWER";
             /**
              * Status
              * @enum {string}
@@ -1797,7 +1797,7 @@ export interface components {
              * @default VIEWER
              * @enum {string}
              */
-            orgRole: "ORG_ADMIN" | "VIEWER";
+            orgRole: "ORG_ADMIN" | "PERFORMANCE_ENGINEER" | "TESTER" | "VIEWER";
         };
         /**
          * UserInvited
@@ -1818,7 +1818,7 @@ export interface components {
              * Orgrole
              * @enum {string}
              */
-            orgRole: "ORG_ADMIN" | "VIEWER";
+            orgRole: "ORG_ADMIN" | "PERFORMANCE_ENGINEER" | "TESTER" | "VIEWER";
             /**
              * Status
              * @enum {string}
@@ -1838,7 +1838,7 @@ export interface components {
              * Orgrole
              * @enum {string}
              */
-            orgRole: "ORG_ADMIN" | "VIEWER";
+            orgRole: "ORG_ADMIN" | "PERFORMANCE_ENGINEER" | "TESTER" | "VIEWER";
         };
         /** ValidationError */
         ValidationError: {

@@ -17,6 +17,7 @@ import sqlalchemy as sa
 from plimsoll_api.db.session import session_for_org
 from plimsoll_api.errors import PlimsollError
 from plimsoll_api.repositories import users_admin as repo
+from plimsoll_api.seed import DEMO_TEST_ID
 from plimsoll_api.services import users as service
 from plimsoll_contracts.errors import ErrorCode
 from plimsoll_contracts.users import UserInvite
@@ -105,6 +106,21 @@ def _clean_up_invited_users() -> Iterator[None]:
         connection.execute(
             sa.text(
                 "DELETE FROM audit_logs WHERE entity_type = 'user' AND entity_id IN "
+                "(SELECT id FROM users WHERE email LIKE 'joiner-%@example.com')"
+            )
+        )
+        # A run records who started it, and the runs outlive these users --
+        # so the attribution is cleared rather than the run removed. Deleting
+        # a real run to tidy up a test user would be the wrong way round.
+        connection.execute(
+            sa.text(
+                "UPDATE test_runs SET initiated_by = NULL WHERE initiated_by IN "
+                "(SELECT id FROM users WHERE email LIKE 'joiner-%@example.com')"
+            )
+        )
+        connection.execute(
+            sa.text(
+                "UPDATE performance_tests SET created_by = NULL WHERE created_by IN "
                 "(SELECT id FROM users WHERE email LIKE 'joiner-%@example.com')"
             )
         )
@@ -280,3 +296,44 @@ def test_users_are_listed_within_one_organisation(admin_client: httpx.Client) ->
     listed = admin_client.get("/api/v1/users").json()["items"]
     assert any(item["id"] == invited["id"] for item in listed)
     assert all("passwordHash" not in item and "temporaryPassword" not in item for item in listed)
+
+
+@pytest.mark.parametrize(
+    ("role", "may_execute", "may_write", "may_administer"),
+    [
+        ("VIEWER", False, False, False),
+        ("TESTER", True, False, False),
+        ("PERFORMANCE_ENGINEER", True, True, False),
+        ("ORG_ADMIN", True, True, True),
+    ],
+)
+def test_a_role_holds_what_it_says_it_holds_over_http(
+    admin_client: httpx.Client, role: str, may_execute: bool, may_write: bool, may_administer: bool
+) -> None:
+    """The map is asserted in a unit test; this is the same claim made where
+    the refusal actually happens. A permission map is only true if the routes
+    read it, and no unit test can tell whether they do."""
+    invited = _invite(admin_client, orgRole=role)
+    project = admin_client.get("/api/v1/projects?limit=1").json()["items"][0]
+
+    with _session_for(str(invited["email"]), str(invited["temporaryPassword"])) as client:
+        # Reading is common to every role.
+        assert client.get("/api/v1/projects?limit=1").status_code == 200
+
+        created = client.post(
+            f"/api/v1/projects/{project['id']}/tests",
+            json={
+                "name": f"role-check-{role}",
+                "configuration": {"virtualUsers": 1, "durationSeconds": 5, "rampUpSeconds": 1},
+                "plans": [],
+                "slaRules": [],
+            },
+        )
+        assert (created.status_code != 403) is may_write, created.status_code
+
+        started = client.post(f"/api/v1/tests/{DEMO_TEST_ID}/runs")
+        assert (started.status_code != 403) is may_execute, started.status_code
+        if started.status_code == 201:
+            admin_client.post(f"/api/v1/runs/{started.json()['id']}/cancel")
+
+        assert (client.get("/api/v1/users").status_code != 403) is may_administer

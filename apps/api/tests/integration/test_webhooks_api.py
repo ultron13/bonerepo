@@ -110,33 +110,43 @@ def test_a_finished_run_announces_itself(completed_run: str) -> None:
     stored, listed, and never fired. There is nothing to raise when an event
     is simply never produced, so the only way to know is to look for it.
 
+    The whole stream is read, not a window of it. The first version took the
+    last two hundred entries, passed alone, and failed in the full suite where
+    three hundred later audit events had pushed the one it wanted out -- a
+    test that depends on how busy the system has been will lie eventually, and
+    that one lied the same day it was written. The second version started its
+    own run to get a position to read from, which worked and made a long suite
+    longer; the run this reuses had already happened.
+
     The stream rather than a receiver: whether a delivery reaches somebody
     else's server is covered by the delivery tests, and putting a real
-    endpoint in the middle of this would make it a test about that endpoint.
+    endpoint in the middle would make this a test about that endpoint.
     """
     import redis
+
+    from plimsoll_api.messaging import DEFAULT_STREAM_CAP
 
     client = redis.Redis.from_url(
         os.environ.get("PLIMSOLL_TEST_REDIS_URL", "redis://localhost:6379/0")
     )
     try:
-        raw = client.xrevrange("webhooks.deliveries", count=200)
+        length = client.xlen("webhooks.deliveries")
+        raw = client.xrange("webhooks.deliveries", count=DEFAULT_STREAM_CAP * 2)
     finally:
         client.close()
 
-    # Normalised once. The client is typed as though every field might be
-    # bytes, str or absent, and threading that through the assertions would
-    # bury what they are actually about.
-    entries: list[dict[str, str]] = []
-    for _, fields in cast("list[tuple[Any, dict[Any, Any]]]", raw):
-        entries.append(
-            {
-                (k.decode() if isinstance(k, bytes) else str(k)): (
-                    v.decode() if isinstance(v, bytes) else str(v)
-                )
-                for k, v in fields.items()
-            }
-        )
+    entries = [
+        {
+            (k.decode() if isinstance(k, bytes) else str(k)): (
+                v.decode() if isinstance(v, bytes) else str(v)
+            )
+            for k, v in fields.items()
+        }
+        for _, fields in cast("list[tuple[Any, dict[Any, Any]]]", raw)
+    ]
+    # The premise: everything published since the stream was last trimmed was
+    # read, so an absence below is a real absence rather than a short read.
+    assert len(entries) == length, "the stream was read short"
 
     mine = {entry["event"]: entry for entry in entries if entry.get("entityId") == completed_run}
     assert "run.completed" in mine, sorted({entry["event"] for entry in entries})

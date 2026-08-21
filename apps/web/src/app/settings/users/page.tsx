@@ -9,11 +9,26 @@ import { Card, Empty, Status } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { OrgRole, Page as Paged, User, UserInvited } from "@/lib/types";
 
-const ROLES: { value: OrgRole; label: string }[] = [
-  { value: "VIEWER", label: "Viewer — can read projects, scripts and results" },
+const ROLES: { value: OrgRole; label: string; short: string }[] = [
+  {
+    value: "VIEWER",
+    short: "Viewer",
+    label: "Viewer — can read projects, scripts and results",
+  },
+  {
+    value: "TESTER",
+    short: "Tester",
+    label: "Tester — can also start runs, but not change what runs",
+  },
+  {
+    value: "PERFORMANCE_ENGINEER",
+    short: "Engineer",
+    label: "Engineer — can also author tests, scripts and thresholds",
+  },
   {
     value: "ORG_ADMIN",
-    label: "Administrator — can also change settings and people",
+    short: "Administrator",
+    label: "Administrator — can also change settings, people and credentials",
   },
 ];
 
@@ -136,9 +151,7 @@ export default function UsersPage() {
                   >
                     {ROLES.map((role) => (
                       <option key={role.value} value={role.value}>
-                        {role.value === "ORG_ADMIN"
-                          ? "Administrator"
-                          : "Viewer"}
+                        {role.short}
                       </option>
                     ))}
                   </select>
