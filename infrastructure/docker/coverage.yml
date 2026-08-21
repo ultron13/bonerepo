@@ -1,0 +1,42 @@
+# Measuring what the integration suite actually exercises.
+#
+# The API and the worker run in containers, so a coverage run on the host sees
+# none of the code the integration suite drives -- which is most of it. Without
+# this the honest number from unit tests alone is around half, and writing
+# tests against that would mean writing tests for things already covered.
+#
+# An overlay rather than a change to the compose file: measurement should not
+# be part of how the system normally runs. `make coverage` composes both.
+services:
+  api:
+    command:
+      - uv
+      - run
+      # Brought in at start rather than baked into the image: measurement is
+      # not something a production image should carry, and the image is
+      # deliberately built without dev dependencies.
+      - --with
+      - coverage[toml]
+      - coverage
+      - run
+      - --parallel-mode
+      - --module
+      - uvicorn
+      - plimsoll_api.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    environment:
+      COVERAGE_FILE: /srv/.coverage-data/.coverage
+    volumes:
+      - ../../.coverage-data:/srv/.coverage-data
+
+  worker:
+    command:
+      ["uv", "run", "--with", "coverage[toml]", "coverage", "run", "--parallel-mode",
+       "-m", "plimsoll_worker"]
+    environment:
+      COVERAGE_FILE: /srv/.coverage-data/.coverage
+    volumes:
+      - ../../.coverage-data:/srv/.coverage-data

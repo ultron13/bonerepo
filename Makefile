@@ -59,6 +59,32 @@ test-int:
 e2e:
 	$(WEB_E2E)
 
+# What the whole suite exercises, not just what runs on this machine.
+#
+# The API and the worker are restarted under coverage, the tests run against
+# them, and the processes are stopped so their data is written -- coverage
+# flushes at exit, so a container still running has recorded nothing. The
+# result is combined with the unit-test run and reported once.
+COVERAGE_COMPOSE := $(COMPOSE) -f infrastructure/docker/coverage.yml
+
+coverage:
+	rm -rf .coverage-data && mkdir -p .coverage-data
+	chmod 777 .coverage-data
+	$(COVERAGE_COMPOSE) up -d --build api worker
+	@until curl -fsS http://localhost:8000/readyz >/dev/null 2>&1; do sleep 2; done
+	uv run --with pytest-cov pytest apps/api/tests/unit apps/worker/tests/unit \
+	  apps/agent/tests packages -q --cov --cov-report= || true
+	uv run pytest apps/api/tests/integration -q || true
+	@# Coverage writes at exit, so the containers have to stop before it exists.
+	$(COVERAGE_COMPOSE) stop api worker
+	@sleep 3
+	cp .coverage-data/.coverage.* . 2>/dev/null || true
+	uv run coverage combine
+	uv run coverage report
+	uv run coverage html -d .coverage-html
+	@echo "Detail: .coverage-html/index.html"
+	$(COMPOSE) up -d api worker
+
 backup:
 	./scripts/backup.sh $(DEST)
 

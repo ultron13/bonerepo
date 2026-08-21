@@ -19,3 +19,7 @@ run-detail.png
 
 # Backups are taken to a path the operator chooses, never into the tree.
 backups/
+.coverage-data/
+.coverage-html/
+.coverage
+.coverage.*

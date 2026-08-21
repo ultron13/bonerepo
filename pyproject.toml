@@ -105,3 +105,35 @@ testpaths = [
     "packages/contracts/python/tests",
 ]
 markers = ["integration: requires the make dev stack"]
+
+[tool.coverage.run]
+# Production code only. Counting the test files would measure how thoroughly
+# the tests test themselves, which is always near a hundred per cent and says
+# nothing about the system.
+source = [
+    "apps/api/plimsoll_api",
+    "apps/worker/plimsoll_worker",
+    "apps/agent/plimsoll_agent",
+    "packages/contracts/python/plimsoll_contracts",
+    "packages/executor-sdk/plimsoll_executor",
+]
+omit = [
+    # Schema history. A migration runs once against a real database and is
+    # covered by the migration test asserting head applies cleanly; importing
+    # one to raise a percentage would measure nothing.
+    "*/migrations/*",
+]
+relative_files = true
+# The API and worker run in containers during the integration suite, so their
+# coverage is recorded there and combined with the local run.
+parallel = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
+    "if __name__ == .__main__.:",
+]
