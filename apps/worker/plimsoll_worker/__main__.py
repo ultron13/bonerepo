@@ -57,6 +57,12 @@ from plimsoll_contracts.metrics import percentile
 from plimsoll_contracts.performance_tests import SlaRuleSpec
 from plimsoll_contracts.runs import GeneratorStatus, RunStatus
 from plimsoll_worker.bundle import BundleRef, stage
+from plimsoll_worker.events import (
+    RUN_COMPLETED,
+    RUN_FAILED,
+    RUN_SLA_BREACHED,
+    announce_run,
+)
 from plimsoll_worker.metrics import merge_batch, write
 from plimsoll_worker.reconciler import Decision, GeneratorRow, RunView, decide, is_silent
 from plimsoll_worker.runtime.base import GeneratorHandle, GeneratorSpec
@@ -454,6 +460,18 @@ class Orchestrator:
                 },
             )
 
+        if result.outcome.name == "FAIL":
+            # A separate event, because a breach is the thing a pipeline gates
+            # on and a completion is not. A run can complete and still fail its
+            # thresholds -- that is the whole point of having them.
+            await announce_run(
+                org_id=org_id,
+                run_id=run.id,
+                project_id=run.project_id,
+                event=RUN_SLA_BREACHED,
+                detail={"detail": result.detail},
+            )
+
     async def _finish(self, run: sa.Row[Any], org_id: uuid.UUID, status: RunStatus) -> None:
         handles = await self._reap(run, org_id)
 
@@ -466,6 +484,16 @@ class Orchestrator:
                 run.id,
                 {"generators": len(handles), "outcome": str(status)},
             )
+
+        # Before the SLA verdict, which takes a settling pause: a pipeline
+        # waiting to know the run is over should not wait on the judging too.
+        await announce_run(
+            org_id=org_id,
+            run_id=run.id,
+            project_id=run.project_id,
+            event=RUN_COMPLETED if status is RunStatus.COMPLETED else RUN_FAILED,
+            detail={"status": str(status)},
+        )
 
         if status is RunStatus.COMPLETED:
             # Only a run that finished has a result worth judging; a failed or

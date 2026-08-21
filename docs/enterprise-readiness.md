@@ -242,6 +242,24 @@ family computed was `user.*`. Nothing raised and nothing logged: the
 subscription simply never fired. Every unit and integration test passed. A
 smoke test against the running stack found it in one attempt.
 
+### 7e. Three advertised events were published by nothing — closed
+
+Shipped in the same commit whose message explains that a subscription which
+never fires is the failure mode worth guarding against. `run.completed`,
+`run.failed` and `run.sla_breached` were accepted by the API, stored, listed,
+and produced by no code at all. Only `audit.*` was wired.
+
+There is nothing to raise when an event is simply never produced, and no
+amount of testing the delivery path finds it. **Fixed:** the worker announces
+a run when it ends, and a breach separately, because a breach is what a
+pipeline gates on and a completion is not.
+
+The general case is now asserted rather than the three instances: a test reads
+the names the contract advertises and checks each against what the code
+publishes. It was verified to bite by adding a name nothing produces. Its own
+premise is asserted too — it looks for absence, and a path that reads nothing
+would find every name absent, or, once the names matched, nothing at all.
+
 ### 8. Operational edges
 
 - The worker container runs as root to reach the Docker socket. Development

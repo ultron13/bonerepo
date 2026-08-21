@@ -7,6 +7,9 @@ surface an operator touches, and the refusals that make it safe to expose.
 
 from __future__ import annotations
 
+import os
+from typing import Any, cast
+
 import httpx
 import pytest
 
@@ -97,3 +100,45 @@ def test_creating_a_subscription_is_itself_audited(admin_client: httpx.Client) -
     mine = next(entry for entry in entries if entry["entityId"] == created["id"])
     assert created["secret"] not in str(mine)
     admin_client.delete(f"/api/v1/webhooks/{created['id']}")
+
+
+def test_a_finished_run_announces_itself(completed_run: str) -> None:
+    """The event a pipeline waits for, on the stream that carries it.
+
+    This exists because three run events were advertised by the API and
+    published by nothing: a subscription to `run.completed` was accepted,
+    stored, listed, and never fired. There is nothing to raise when an event
+    is simply never produced, so the only way to know is to look for it.
+
+    The stream rather than a receiver: whether a delivery reaches somebody
+    else's server is covered by the delivery tests, and putting a real
+    endpoint in the middle of this would make it a test about that endpoint.
+    """
+    import redis
+
+    client = redis.Redis.from_url(
+        os.environ.get("PLIMSOLL_TEST_REDIS_URL", "redis://localhost:6379/0")
+    )
+    try:
+        raw = client.xrevrange("webhooks.deliveries", count=200)
+    finally:
+        client.close()
+
+    # Normalised once. The client is typed as though every field might be
+    # bytes, str or absent, and threading that through the assertions would
+    # bury what they are actually about.
+    entries: list[dict[str, str]] = []
+    for _, fields in cast("list[tuple[Any, dict[Any, Any]]]", raw):
+        entries.append(
+            {
+                (k.decode() if isinstance(k, bytes) else str(k)): (
+                    v.decode() if isinstance(v, bytes) else str(v)
+                )
+                for k, v in fields.items()
+            }
+        )
+
+    mine = {entry["event"]: entry for entry in entries if entry.get("entityId") == completed_run}
+    assert "run.completed" in mine, sorted({entry["event"] for entry in entries})
+    # A run is not an action somebody took, so nobody is named as its actor.
+    assert mine["run.completed"].get("actorId", "") == ""
